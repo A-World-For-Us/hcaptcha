@@ -7,8 +7,6 @@ defmodule Hcaptcha do
 
   alias Hcaptcha.{Config, Http, Response}
 
-  @http_client Application.compile_env(:hcaptcha, :http_client, Http)
-
   # https://docs.hcaptcha.com/#siteverify-error-codes-table
   @error_codes_map %{
     # Your secret key is missing.
@@ -47,7 +45,7 @@ defmodule Hcaptcha do
           {:ok, Response.t()} | {:error, [atom]}
   def verify(response, options \\ []) do
     verification =
-      @http_client.request_verification(
+      http_client().request_verification(
         request_body(response, options),
         Keyword.take(options, [:timeout])
       )
@@ -83,4 +81,6 @@ defmodule Hcaptcha do
   defp atomise_api_error(error) do
     Map.get(@error_codes_map, error, :unknown_error)
   end
+
+  defp http_client, do: Application.get_env(:hcaptcha, :http_client, Http)
 end
