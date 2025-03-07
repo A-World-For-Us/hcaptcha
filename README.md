@@ -1,4 +1,6 @@
-# Hcaptcha
+# Hcaptcha (Forked)
+
+**Fork made in the light of problems we had with the original library with no answer / activity on the original repo.**
 
 [![Hex.pm](https://img.shields.io/badge/Hex-v2.1.1-green.svg)](https://hexdocs.pm/hcaptcha)
 
