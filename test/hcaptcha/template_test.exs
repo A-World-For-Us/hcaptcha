@@ -65,7 +65,7 @@ defmodule Hcaptcha.TemplateTest do
       html = Template.display()
 
       assert html =~
-               "https://js.hcaptcha.com/1/api.js?render=explicit\\u0026onload=hcaptchaOnload"
+               "https://js.hcaptcha.com/1/api.js?render=explicit\\u0026onload=hcaptchaElixirTemplateOnload"
 
       refute html =~ "hl="
     end
@@ -93,6 +93,18 @@ defmodule Hcaptcha.TemplateTest do
       html = Template.display()
       assert html =~ "<script>"
       assert html =~ "nonce: null"
+    end
+
+    test "treats an empty nonce like no nonce" do
+      html = Template.display(nonce: "")
+      assert html =~ "<script>"
+      assert html =~ "nonce: null"
+    end
+
+    test "raises on input that is not valid UTF-8" do
+      assert_raise ArgumentError, fn -> Template.display(theme: <<255, 254>>) end
+      assert_raise ArgumentError, fn -> Template.display(nonce: "ab" <> <<255>> <> "cd") end
+      assert_raise ArgumentError, fn -> Template.display(onload: <<0xC3>>) end
     end
 
     test "escapes values written into JavaScript" do
@@ -127,13 +139,13 @@ defmodule Hcaptcha.TemplateTest do
       assert html =~ ~s|"close-callback"|
     end
 
-    test "defines no global function other than hcaptchaOnload and hcaptchaLoader" do
+    test "defines no global function other than the two hcaptchaElixirTemplate names" do
       html = Template.display(size: "invisible")
 
       refute html =~ "function hcaptchaCallback"
       refute html =~ "function onSubmit"
-      assert html =~ "w.hcaptchaOnload = function"
-      assert html =~ "w.hcaptchaLoader"
+      assert html =~ "w.hcaptchaElixirTemplateOnload = function"
+      assert html =~ "w.hcaptchaElixirTemplate"
     end
 
     test "two calls share the loader and keep separate widget ids" do

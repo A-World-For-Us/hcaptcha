@@ -7,6 +7,9 @@ defmodule Hcaptcha.Template do
   The output holds a container `<div>` and an inline `<script>`. The script loads the hCaptcha
   API once per page, then renders the widget in the container. Several calls on one page work:
   they share one API script. The `:hl` option of the first call on a page sets the language.
+
+  The template is for forms rendered by controllers. LiveView `phx-submit` forms are not
+  supported. Do not load `api.js` yourself on a page that uses `display/1`.
   """
 
   @script_path Path.join(__DIR__, "template.js")
@@ -34,14 +37,16 @@ defmodule Hcaptcha.Template do
   ## Invisible mode
 
   With `size: "invisible"` the widget runs when the form that contains it is submitted. The
-  submit event of other forms is untouched. If the hCaptcha script does not load, the form
-  submits without a token.
+  submit event of other forms is untouched. The challenge runs once per submit, then the form
+  is sent again with the token and the clicked button. If the hCaptcha script fails to load,
+  is not ready within 10 seconds, or fails to render the widget, the form is sent without a
+  token.
   """
   @spec display(keyword()) :: String.t()
   def display(options \\ []) do
     id = "h-captcha-" <> Base.encode16(:crypto.strong_rand_bytes(6), case: :lower)
     invisible? = options[:size] == "invisible"
-    nonce = options[:nonce]
+    nonce = if options[:nonce] == "", do: nil, else: options[:nonce]
 
     attributes =
       [
@@ -68,7 +73,7 @@ defmodule Hcaptcha.Template do
 
   defp api_url(options) do
     query =
-      [render: "explicit", onload: "hcaptchaOnload"] ++
+      [render: "explicit", onload: "hcaptchaElixirTemplateOnload"] ++
         if(options[:hl], do: [hl: options[:hl]], else: [])
 
     @api_url <> "?" <> URI.encode_query(query)
@@ -76,7 +81,7 @@ defmodule Hcaptcha.Template do
 
   defp attributes(attributes) do
     for {name, value} <- attributes, not is_nil(value), into: "" do
-      ~s( #{name}="#{escape_html(to_string(value))}")
+      ~s( #{name}="#{escape_html(utf8!(value))}")
     end
   end
 
@@ -98,7 +103,7 @@ defmodule Hcaptcha.Template do
 
   defp js(value) do
     escaped =
-      for <<char::utf8 <- to_string(value)>>, into: "" do
+      for <<char::utf8 <- utf8!(value)>>, into: "" do
         case char do
           ?" -> "\\\""
           ?\\ -> "\\\\"
@@ -108,6 +113,16 @@ defmodule Hcaptcha.Template do
       end
 
     ~s("#{escaped}")
+  end
+
+  defp utf8!(value) do
+    string = to_string(value)
+
+    if String.valid?(string) do
+      string
+    else
+      raise ArgumentError, "hcaptcha template option is not valid UTF-8: #{inspect(string)}"
+    end
   end
 
   defp unicode_escape(char) do
