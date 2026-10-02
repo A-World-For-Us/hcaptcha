@@ -1,31 +1,34 @@
 # Contributing
 
-## Pull Requests Welcome
+## Pull requests
 
 1. Fork the project
 2. Create a topic branch
-3. Make logically-grouped commits with clear commit messages
+3. Make logically-grouped commits with clear commit messages (Conventional Commits)
 4. Push commits to your fork
-5. Open a pull request against `hcaptcha/master`
+5. Open a pull request against `master`
 
 ## Issues
 
-If you believe there to be a bug, please provide the maintainers with enough
-detail to reproduce or a link to an app exhibiting unexpected behavior. For
-help, please start with Stack Overflow.
+If you believe there is a bug, give the maintainers enough detail to reproduce it,
+or a link to an app that shows the problem.
 
-## Development and testing
+## Development
 
-To set up the development environment you would have to follow several steps:
-
-0. setup `elixir`, we are using the latest release, but supporting everything from `1.2`
-1. clone the repo
+1. Install the versions in `.tool-versions` (for example with [asdf](https://asdf-vm.com)).
+   The library supports Elixir 1.17 and later.
 2. `mix deps.get && mix compile`
 
-To test if everything is working:
+Checks to run before you open a pull request:
 
-1. `mix test` will run unit-tests
-2. `mix credo --strict` will run linting
-3. `mix dialyzer` will run static analyzer tool to check that everything is fine with your code. It may take some time at the first run
+1. `mix format --check-formatted`
+2. `mix compile --warnings-as-errors`
+3. `mix test`
+4. `mix credo --strict`
+5. `mix dialyzer` (the first run builds the PLTs and is slow)
 
-If everything is fine - feel free to submit your code!
+To ignore the bulk formatting commit in `git blame`:
+
+```
+git config blame.ignoreRevsFile .git-blame-ignore-revs
+```
