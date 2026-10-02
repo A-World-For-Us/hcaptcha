@@ -21,17 +21,6 @@ defmodule Hcaptcha.Http do
 
   @default_verify_url "https://api.hcaptcha.com/siteverify"
   @default_timeout 5000
-  @owned_options [
-    :method,
-    :url,
-    :body,
-    :headers,
-    :retry,
-    :redirect,
-    :decode_body,
-    :into,
-    :receive_timeout
-  ]
 
   @doc """
   Posts the form-encoded `body` to the verify URL.
@@ -56,7 +45,6 @@ defmodule Hcaptcha.Http do
     connect_options = Keyword.put(user_options[:connect_options] || [], :timeout, timeout)
 
     user_options
-    |> Keyword.drop([:connect_options | @owned_options])
     |> Keyword.merge(
       method: :post,
       url: Application.get_env(:hcaptcha, :verify_url, @default_verify_url),
@@ -69,7 +57,8 @@ defmodule Hcaptcha.Http do
       connect_options: connect_options,
       retry: false,
       redirect: false,
-      decode_body: false
+      decode_body: false,
+      into: nil
     )
     |> Req.request()
     |> handle_result()

@@ -176,6 +176,7 @@ defmodule Hcaptcha.HttpTest do
             retry: :transient,
             redirect: true,
             decode_body: true,
+            into: :self,
             url: "https://evil.test/x",
             method: :get,
             body: "evil=1",
