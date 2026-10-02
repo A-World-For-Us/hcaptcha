@@ -41,8 +41,10 @@ defmodule Hcaptcha.Http.MockClient do
         {:ok,
          %{
            "success" => true,
-           "challenge_ts" => DateTime.to_iso8601(DateTime.utc_now()),
-           "hostname" => "dummy-key-pass"
+           "credit" => false,
+           "hostname" => "dummy-key-pass",
+           "challenge_ts" =>
+             DateTime.utc_now() |> DateTime.truncate(:millisecond) |> DateTime.to_iso8601()
          }}
 
       %{"secret" => ^test_secret} ->

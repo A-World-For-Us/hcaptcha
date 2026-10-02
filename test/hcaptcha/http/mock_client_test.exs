@@ -9,11 +9,13 @@ defmodule Hcaptcha.Http.MockClientTest do
   test "accepts the test token with the test secret" do
     request = body(secret: TestKeys.secret(), response: TestKeys.token())
 
-    assert {:ok, %{"success" => true, "challenge_ts" => ts, "hostname" => host}} =
+    assert {:ok,
+            %{"success" => true, "credit" => false, "challenge_ts" => ts, "hostname" => host}} =
              MockClient.request_verification(request, timeout: 10)
 
     assert {:ok, _, _} = DateTime.from_iso8601(ts)
-    assert is_binary(host)
+    assert host == "dummy-key-pass"
+    assert ts =~ ~r/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/
     assert_received {:request_verification, ^request, [timeout: 10]}
   end
 
