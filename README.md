@@ -131,7 +131,7 @@ case Hcaptcha.verify(token) do
 end
 ```
 
-The [`Hcaptcha` module documentation](Hcaptcha.html#module-error-atoms) lists every atom.
+The moduledoc of `Hcaptcha` ([`lib/hcaptcha.ex`](lib/hcaptcha.ex)) lists every atom.
 
 ## Testing
 
