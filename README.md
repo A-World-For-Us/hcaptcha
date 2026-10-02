@@ -1,166 +1,124 @@
-# Hcaptcha (Forked)
+# Hcaptcha
 
-**Fork made in the light of problems we had with the original library with no answer / activity on the original repo.**
+An Elixir package to add [hCaptcha](https://www.hcaptcha.com/) to Elixir applications: server-side verification and a template that renders the widget.
 
-[![Hex.pm](https://img.shields.io/badge/Hex-v2.1.1-green.svg)](https://hexdocs.pm/hcaptcha)
-
-A simple Elixir package for implementing [hCAPTCHA] in Elixir applications.
-
-[hCAPTCHA]: https://www.hcaptcha.com/
-
-The package is fork of the [recaptcha] package which uses the same flow as needed for hCaptcha. It would also be possible to integrate hCaptcha in this package but I was not able to wait for PRs to be merged so I just forked the repo.
-
-[recaptcha]: https://github.com/samueljseay/recaptcha
-
-### Important Notice
-The repo works for me but is not tested that all configuration options or callbacks given by hCaptcha are processed correctly. Feel free to open PRs to resolve dependencies on the recaptcha API.
+This is a maintained fork of [sebastiangrebe/hcaptcha](https://github.com/sebastiangrebe/hcaptcha), which is itself a fork of [recaptcha](https://github.com/samueljseay/recaptcha). It is not published on Hex.
 
 ## Installation
 
-1. Add hcaptcha to your `mix.exs` dependencies
+Add the package to your dependencies in `mix.exs`:
 
 ```elixir
-  defp deps do
-    [
-      {:hcaptcha, "~> 0.0.2"},
-    ]
-  end
+def deps do
+  [
+    {:hcaptcha, github: "A-World-For-Us/hcaptcha", branch: "master"}
+  ]
+end
 ```
 
-2. List `:hcaptcha` as an application dependency
+## Configuration
+
+Read the keys from the environment in `config/runtime.exs`:
 
 ```elixir
-  def application do
-    [ extra_applications: [:hcaptcha] ]
-  end
+config :hcaptcha,
+  public_key: System.fetch_env!("HCAPTCHA_PUBLIC_KEY"),
+  secret: System.fetch_env!("HCAPTCHA_PRIVATE_KEY")
 ```
 
-3. Run `mix do deps.get, compile`
-
-## Config
-
-By default the public and private keys are loaded via the `HCAPTCHA_PUBLIC_KEY` and `HCAPTCHA_PRIVATE_KEY` environment variables.
+Other keys:
 
 ```elixir
-  config :hcaptcha,
-    public_key: {:system, "HCAPTCHA_PUBLIC_KEY"},
-    secret: {:system, "HCAPTCHA_PRIVATE_KEY"}
+config :hcaptcha, :json_library, Poison
 ```
 
-### JSON Decoding
-
-By default `hCaptcha` will use `Jason` to decode JSON responses, this can be changed as such:
-
-```elixir
-  config :hcaptcha, :json_library, Poison
-```
+`:json_library` defaults to `Jason`.
 
 ## Usage
 
-### Render the Widget
+### Render the widget
 
-Use `raw` (if you're using Phoenix.HTML) and `Hcaptcha.Template.display/1` methods to render the captcha widget.
+Use `raw` (from Phoenix.HTML) and `Hcaptcha.Template.display/1`.
 
-For hcaptcha with checkbox
+Checkbox:
+
 ```html
-<form name="someform" method="post" action="/somewhere">
-  ...
+<form method="post" action="/somewhere">
   <%= raw Hcaptcha.Template.display %>
-  ...
 </form>
 ```
 
-For invisible hcaptcha
+Invisible:
+
 ```html
-<form name="someform" method="post" action="/somewhere">
-  ...
+<form method="post" action="/somewhere">
   <%= raw Hcaptcha.Template.display(size: "invisible") %>
 </form>
-  ...
 ```
 
-Since hcaptcha loads Javascript code asynchronously, you cannot immediately submit the captcha form.
-If you have logic that needs to know if the captcha code has already been loaded (for example disabling submit button until fully loaded), it is possible to pass in a JS-callback that will be called once the captcha has finished loading.
-This can be done as follows:
+The hCaptcha script loads asynchronously. To run code once it has loaded, pass the name of a JavaScript function:
 
 ```html
-<form name="someform" method="post" action="/somewhere">
-  ...
-  <%= raw Hcaptcha.Template.display(onload: "myOnLoadCallback") %>
-</form>
-  ...
+<%= raw Hcaptcha.Template.display(onload: "myOnLoadCallback") %>
 ```
 
-And then in your JS code:
+`display/1` options:
 
-```javascript
-function myOnLoadCallback() {
-  // perform extra actions here
-}
-```
+| Option       | Action                                         | Default                  |
+| :----------- | :--------------------------------------------- | :----------------------- |
+| `public_key` | Sets the `data-sitekey` attribute              | `:public_key` from config |
+| `hl`         | Language of the widget                         | `en`                     |
+| `onload`     | Name of a JavaScript function called on load   | none                     |
+| `callback`   | Name of the JavaScript function called on success | `hcaptchaCallback` when `size` is `"invisible"` |
+| `theme`, `type`, `tabindex`, `size`, `badge` | Set the matching `data-*` attributes | none |
 
-`display` method accepts additional options as a keyword list, the options are:
-
-Option                  | Action                                                 | Default
-:---------------------- | :----------------------------------------------------- | :------------------------
-`public_key`            | Sets key to the `data-sitekey` hCaptcha div attribute | Public key from the config file
-`hl`                    | Sets the language of the hCaptcha                     | en
-
-### Verify API
-
-Hcaptcha provides the `verify/2` method. Below is an example using a Phoenix controller action:
+### Verify the response
 
 ```elixir
-  def create(conn, params) do
-    case Hcaptcha.verify(params["h-captcha-response"]) do
-      {:ok, response} -> do_something
-      {:error, errors} -> handle_error
-    end
+def create(conn, params) do
+  case Hcaptcha.verify(params["h-captcha-response"]) do
+    {:ok, response} -> do_something(response)
+    {:error, errors} -> handle_error(errors)
   end
+end
 ```
 
-`verify` method sends a `POST` request to the hCAPTCHA API and returns 2 possible values:
+`Hcaptcha.verify/2` sends a `POST` request to the hCaptcha API and returns:
 
-`{:ok, %Hcaptcha.Response{challenge_ts: timestamp, hostname: host}}` -> The captcha is valid, see the [documentation](https://docs.hcaptcha.com/#verify-the-user-response-server-side) for more details.
+- `{:ok, %Hcaptcha.Response{challenge_ts: timestamp, hostname: host}}` when the response is valid. See the [API documentation](https://docs.hcaptcha.com/#verify-the-user-response-server-side).
+- `{:error, errors}` with a list of atoms. They come from the API [error codes](https://docs.hcaptcha.com/#siteverify-error-codes-table), or are `:challenge_failed` when the request succeeds but the challenge fails.
 
-`{:error, errors}` -> `errors` contains atomised versions of the errors returned by the API, See the [error documentation](https://docs.hcaptcha.com/#siteverify-error-codes-table) for more details. Errors caused by timeouts in HTTPoison or Jason encoding are also returned as atoms. If the hcaptcha request succeeds but the challenge is failed, a `:challenge_failed` error is returned.
+Options:
 
-`verify` method also accepts a keyword list as the third parameter with the following options:
-
-Option                  | Action                                                 | Default
-:---------------------- | :----------------------------------------------------- | :------------------------
-`timeout`               | Time to wait before timeout                            | 5000 (ms)
-`secret`                | Private key to send as a parameter of the API request  | Private key from the config file
-`remote_ip`             | Optional. The user's IP address, used by hCaptcha     | no default
-
+| Option      | Action                                | Default                  |
+| :---------- | :------------------------------------ | :----------------------- |
+| `timeout`   | Time to wait for the API, in ms       | `5000`                   |
+| `secret`    | Secret sent with the request          | `:secret` from config    |
+| `remote_ip` | The user's IP address                 | none                     |
 
 ## Testing
 
-In order to test your endpoints you should set the secret key to the following value in order to receive a positive result from all queries to the Hcaptcha engine.
+hCaptcha publishes [test keys](https://docs.hcaptcha.com/#integration-testing-test-keys). With the test secret `0x0000000000000000000000000000000000000000`, the API accepts the token `10000000-aaaa-bbbb-cccc-000000000001`. This needs network access.
 
-```
-config :hcaptcha,
-  secret: "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe"
-```
+To test without network access, use the mock client:
 
-Setting up tests without network access can be done also. When configured as such a positive or negative result can be generated locally.
-
-```
+```elixir
 config :hcaptcha,
   http_client: Hcaptcha.Http.MockClient,
   secret: "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe"
-
-
-  {:ok, _details} = Hcaptcha.verify("valid_response")
-
-  {:error, _details} = Hcaptcha.verify("invalid_response")
-
 ```
+
+```elixir
+{:ok, _response} = Hcaptcha.verify("valid_response")
+{:error, _errors} = Hcaptcha.verify("invalid_response")
+```
+
+The mock client sends any other token to the real API.
 
 ## Contributing
 
-Check out [CONTRIBUTING.md](/CONTRIBUTING.md) if you want to help.
+See [CONTRIBUTING.md](https://github.com/A-World-For-Us/hcaptcha/blob/master/CONTRIBUTING.md).
 
 ## License
 
-[MIT License](http://www.opensource.org/licenses/MIT).
+[MIT](https://opensource.org/licenses/MIT)
