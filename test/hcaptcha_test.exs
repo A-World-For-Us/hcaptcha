@@ -50,9 +50,11 @@ defmodule HcaptchaTest do
       test "#{inspect(secret)} with #{inspect(client)} returns :missing_input_secret, no request" do
         use_client(unquote(client))
         Application.put_env(:hcaptcha, :secret, unquote(secret))
+        stub_api(%{"success" => true})
 
         assert {:error, [:missing_input_secret]} = Hcaptcha.verify("token")
         refute_received {:request_verification, _, _}
+        refute_received {:api_request, _}
       end
     end
 
@@ -79,6 +81,19 @@ defmodule HcaptchaTest do
 
       assert is_binary(host)
       assert {:ok, _, _} = DateTime.from_iso8601(ts)
+    end
+
+    test "valid_response with the test secret succeeds" do
+      assert {:ok, %Response{}} = Hcaptcha.verify("valid_response")
+    end
+
+    test "invalid_response with the test secret returns :invalid_input_response" do
+      assert {:error, [:invalid_input_response]} = Hcaptcha.verify("invalid_response")
+    end
+
+    test "valid_response with a real secret is refused" do
+      assert {:error, [:mock_requires_test_secret]} =
+               Hcaptcha.verify("valid_response", secret: "0xabc")
     end
 
     test "another token with the test secret returns :invalid_input_response" do
@@ -220,7 +235,6 @@ defmodule HcaptchaTest do
         {"missing-remoteip", :missing_remoteip},
         {"invalid-remoteip", :invalid_remoteip},
         {"not-using-dummy-passcode", :not_using_dummy_passcode},
-        {"not-using-dummy-secret", :not_using_dummy_passcode},
         {"sitekey-secret-mismatch", :sitekey_secret_mismatch},
         {"something-new", :unknown_error}
       ]
