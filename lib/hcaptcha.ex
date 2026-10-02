@@ -25,7 +25,8 @@ defmodule Hcaptcha do
     * `:expired_input_response` - the token expired (120 s by default)
     * `:already_seen_response` - the token was already verified once
     * `:sitekey_secret_mismatch` - the sitekey does not belong to the secret
-    * `:missing_input_secret` - no secret is configured, and no request was made
+    * `:missing_input_secret` - no secret is configured, and no request was made.
+      The API can also return it when a request has no secret.
     * `:challenge_failed` - the API answered `success: false` with no error code
     * `:unknown_error` - the API sent an error code this library does not know
     * `:unexpected_response` - the API answer has no known shape
