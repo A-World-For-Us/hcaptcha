@@ -77,6 +77,7 @@ The template is for forms rendered by controllers. LiveView `phx-submit` forms a
 | `hl`         | Language of the widget                         | none, hCaptcha detects the language |
 | `onload`     | Name of a global JavaScript function, called once without arguments when the hCaptcha script is ready, however many widgets use it | none |
 | `callback`   | Name of a global JavaScript function, called with the token on success. In invisible mode the form is submitted after it returns | none |
+| `class`      | CSS class of the container `<div>`, which has none by default | none |
 | `nonce`      | CSP nonce, set on the inline script and on the script it adds | none |
 | `theme`, `type`, `tabindex`, `size`, `badge` | Set the matching `data-*` attributes | none |
 
