@@ -121,29 +121,17 @@ Options:
 
 ### Errors
 
-| Error | Cause |
-| :---- | :---- |
-| `:missing_input_response` | No token given (no request sent), or the API reports it missing |
-| `:invalid_input_response` | The API rejected the token |
-| `:expired_input_response` | The token expired (120 s by default) |
-| `:already_seen_response` | The token was already verified once |
-| `:invalid_or_already_seen_response` | Older API code for the two cases above |
-| `:missing_input_secret` | No secret configured (no request sent), or the API reports it missing |
-| `:invalid_input_secret` | The secret is invalid |
-| `:bad_request` | The API reports a malformed request |
-| `:missing_remoteip`, `:invalid_remoteip` | Problem with the `remote_ip` option |
-| `:not_using_dummy_passcode` | A test sitekey was used with a secret that is not the test secret |
-| `:sitekey_secret_mismatch` | The sitekey does not belong to the secret |
-| `:unknown_error` | The API sent an error code this library does not know |
-| `:challenge_failed` | The API answered `success: false` with no error code |
-| `:unexpected_response` | The API answer has no known shape |
-| `:invalid_response_body` | The API answer is not a JSON object |
-| `:unexpected_status` | HTTP status other than 200, without error codes in the body |
-| `:timeout`, `:econnrefused`, ... | Transport failure. The reason comes from Mint |
-| `:http_error` | Any other HTTP client failure |
-| `:mock_requires_test_secret` | Only from `Hcaptcha.Http.MockClient`, see below |
+`verify/2` returns `{:error, atoms}`. The list can hold several atoms when the API returns several codes. Match `:missing_input_response` first to tell a missing token (the widget script was blocked) from a bad one:
 
-The list can hold several atoms when the API returns several codes.
+```elixir
+case Hcaptcha.verify(token) do
+  {:ok, _response} -> :ok
+  {:error, [:missing_input_response]} -> :no_token
+  {:error, errors} -> {:rejected, errors}
+end
+```
+
+The [`Hcaptcha` module documentation](Hcaptcha.html#module-error-atoms) lists every atom.
 
 ## Testing
 
@@ -163,7 +151,7 @@ config :hcaptcha,
 {:error, [:invalid_input_response]} = Hcaptcha.verify("anything else")
 ```
 
-The mock never calls the network. It accepts only the test token and only with the test secret. With any other secret it returns `{:error, [:mock_requires_test_secret]}`, so a mock left in production rejects every user and lets nobody through. The mock records nothing and sends no message. To check the request body, stub the API with `Req.Test` (below).
+The mock never calls the network. With the test secret it accepts the test token and `valid_response`. Every other token, `invalid_response` included, returns `:invalid_input_response`. With any other secret it returns `{:error, [:mock_requires_test_secret]}`, so a mock left in production rejects every user and lets nobody through. The mock records nothing and sends no message. To check the request body, stub the API with `Req.Test` (below).
 
 To stub the API itself, use `Req.Test`. It needs `{:plug, "~> 1.16", only: :test}` in your own dependencies:
 
