@@ -45,7 +45,7 @@ All keys are read at runtime. `{:system, "VAR"}` tuples are not supported.
 
 ### Render the widget
 
-Use `raw` (from Phoenix.HTML) and `Hcaptcha.Template.display/1`.
+Use `raw` (from Phoenix.HTML) and `Hcaptcha.Template.display/1`. It returns a string with a container `<div>` and an inline `<script>`.
 
 Checkbox:
 
@@ -55,7 +55,7 @@ Checkbox:
 </form>
 ```
 
-Invisible:
+Invisible. The challenge runs when the form that contains the widget is submitted. Other forms on the page are not touched:
 
 ```html
 <form method="post" action="/somewhere">
@@ -63,21 +63,58 @@ Invisible:
 </form>
 ```
 
-The hCaptcha script loads asynchronously. To run code once it has loaded, pass the name of a JavaScript function:
+Several widgets can share one page, for example two invisible forms, or one invisible and one checkbox. The page loads the hCaptcha script once. The `hl` option of the first widget sets the language.
 
-```html
-<%= raw Hcaptcha.Template.display(onload: "myOnLoadCallback") %>
-```
+If the hCaptcha script does not load, an invisible form submits without a token. `Hcaptcha.verify/2` then returns an error for the missing token.
 
 `display/1` options:
 
 | Option       | Action                                         | Default                  |
 | :----------- | :--------------------------------------------- | :----------------------- |
 | `public_key` | Sets the `data-sitekey` attribute              | `:public_key` from config |
-| `hl`         | Language of the widget                         | `en`                     |
-| `onload`     | Name of a JavaScript function called on load   | none                     |
-| `callback`   | Name of the JavaScript function called on success | `hcaptchaCallback` when `size` is `"invisible"` |
+| `hl`         | Language of the widget                         | none, hCaptcha detects the language |
+| `onload`     | Name of a global JavaScript function, called without arguments when the hCaptcha script is ready | none |
+| `callback`   | Name of a global JavaScript function, called with the token on success. In invisible mode the form is submitted after it returns | none |
+| `nonce`      | CSP nonce, set on the inline script and on the script it adds | none |
 | `theme`, `type`, `tabindex`, `size`, `badge` | Set the matching `data-*` attributes | none |
+
+Options that are `nil` are left out. All values are HTML-escaped.
+
+### Content Security Policy
+
+hCaptcha [needs these directives](https://docs.hcaptcha.com/#content-security-policy-settings):
+
+```text
+script-src  https://hcaptcha.com https://*.hcaptcha.com
+frame-src   https://hcaptcha.com https://*.hcaptcha.com
+style-src   https://hcaptcha.com https://*.hcaptcha.com
+connect-src https://hcaptcha.com https://*.hcaptcha.com
+```
+
+If your policy uses nonces, pass the nonce to `display/1`. With `'strict-dynamic'` the inline script is allowed by its nonce, and the hCaptcha script it adds inherits that trust.
+
+```elixir
+# router.ex
+plug :put_csp_nonce
+
+defp put_csp_nonce(conn, _opts) do
+  nonce = 16 |> :crypto.strong_rand_bytes() |> Base.encode64(padding: false)
+
+  conn
+  |> assign(:csp_nonce, nonce)
+  |> put_resp_header(
+    "content-security-policy",
+    "script-src 'nonce-#{nonce}' 'strict-dynamic' https://hcaptcha.com https://*.hcaptcha.com; " <>
+      "frame-src https://hcaptcha.com https://*.hcaptcha.com; " <>
+      "style-src 'self' https://hcaptcha.com https://*.hcaptcha.com; " <>
+      "connect-src 'self' https://hcaptcha.com https://*.hcaptcha.com"
+  )
+end
+```
+
+```html
+<%= raw Hcaptcha.Template.display(size: "invisible", nonce: @csp_nonce) %>
+```
 
 ### Verify the response
 
