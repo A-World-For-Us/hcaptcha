@@ -1,3 +1,6 @@
+# Copied from the Elixir workflows of A-World-For-Us/common-ci, which is private. A public
+# repository cannot call reusable workflows from a private one:
+# https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations#access-to-reusable-workflows
 name: CI
 
 on:
