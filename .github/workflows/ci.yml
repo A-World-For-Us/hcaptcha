@@ -97,3 +97,11 @@ jobs:
       - name: Run Dialyzer
         if: matrix.lint
         run: mix dialyzer --format github
+
+      - name: Check documentation
+        if: matrix.lint
+        env:
+          MIX_ENV: dev
+        run: |
+          mix deps.get
+          mix docs --warnings-as-errors
