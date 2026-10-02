@@ -22,6 +22,9 @@ defmodule Hcaptcha do
     * `:missing_input_response` - no token was given, and no request was made.
       The widget script was probably blocked or did not run.
     * `:invalid_input_response` - the API rejected the token
+    * `:expired_input_response` - the token expired (120 s by default)
+    * `:already_seen_response` - the token was already verified once
+    * `:sitekey_secret_mismatch` - the sitekey does not belong to the secret
     * `:missing_input_secret` - no secret is configured, and no request was made
     * `:challenge_failed` - the API answered `success: false` with no error code
     * `:unknown_error` - the API sent an error code this library does not know
@@ -32,7 +35,6 @@ defmodule Hcaptcha do
   """
 
   alias Hcaptcha.Http
-  alias Hcaptcha.Http.MockClient
   alias Hcaptcha.Response
 
   @error_codes %{
@@ -48,6 +50,7 @@ defmodule Hcaptcha do
     "invalid-remoteip" => :invalid_remoteip,
     "not-using-dummy-passcode" => :not_using_dummy_passcode,
     "not-using-dummy-secret" => :not_using_dummy_passcode,
+    "not-using-secret-key" => :not_using_secret_key,
     "sitekey-secret-mismatch" => :sitekey_secret_mismatch
   }
 
@@ -63,14 +66,25 @@ defmodule Hcaptcha do
   Verifies the `h-captcha-response` token of a submitted form.
 
   A `nil`, empty or non-binary token returns `{:error, [:missing_input_response]}`
-  without a request. A rejected token returns `{:error, [:invalid_input_response]}`.
+  without a request. A missing, empty or non-binary secret returns
+  `{:error, [:missing_input_secret]}` without a request, with any client.
+
+  A token that the API refuses returns one of `:invalid_input_response`,
+  `:expired_input_response`, `:already_seen_response` or
+  `:sitekey_secret_mismatch`. See the module doc for all atoms.
 
   ## Options
 
-    * `:timeout` - request timeout in ms (default: config `:timeout`, then 5000)
-    * `:secret` - overrides the configured secret
+    * `:timeout` - connect and receive timeout in ms, see `Hcaptcha.Http`
+      (default: config `:timeout`, then 5000)
+    * `:secret` - takes precedence over the configured secret, with every client
     * `:remote_ip` - the user's IP, as a string or an `:inet` tuple
     * `:sitekey` - the sitekey the token must have been issued for
+
+  A bad option value is a programming error and raises `ArgumentError`: a
+  `:remote_ip` that is not a string or a valid `:inet` address, a `:sitekey`
+  that is not a string, or a `:timeout` that is not a non-negative integer or
+  `:infinity`.
 
   ## Example
 
@@ -84,16 +98,15 @@ defmodule Hcaptcha do
   def verify(token, options \\ [])
 
   def verify(token, options) when is_binary(token) and token != "" do
-    client = http_client()
+    options = validate_options!(options)
     secret = Keyword.get_lazy(options, :secret, fn -> Application.get_env(:hcaptcha, :secret) end)
 
-    if blank?(secret) and client != MockClient do
+    if blank?(secret) do
       {:error, [:missing_input_secret]}
     else
-      body = request_body(token, secret, options)
-
-      body
-      |> client.request_verification(Keyword.take(options, [:timeout]))
+      token
+      |> request_body(secret, options)
+      |> http_client().request_verification(Keyword.take(options, [:timeout]))
       |> map_result()
     end
   end
@@ -106,23 +119,49 @@ defmodule Hcaptcha do
   @spec public_key() :: String.t() | nil
   def public_key, do: Application.get_env(:hcaptcha, :public_key)
 
-  defp request_body(token, secret, options) do
-    URI.encode_query(
-      Enum.reject(
-        [
-          secret: secret,
-          response: token,
-          remoteip: format_ip(options[:remote_ip]),
-          sitekey: options[:sitekey]
-        ],
-        fn {_key, value} -> is_nil(value) end
-      )
+  defp validate_options!(options) do
+    Keyword.update(options, :remote_ip, nil, &validate_ip!/1)
+    |> validate!(:sitekey, &(is_nil(&1) or is_binary(&1)), "a string")
+    |> validate!(
+      :timeout,
+      &(is_nil(&1) or &1 == :infinity or (is_integer(&1) and &1 >= 0)),
+      "a non-negative integer or :infinity"
     )
   end
 
-  defp format_ip(nil), do: nil
-  defp format_ip(ip) when is_binary(ip), do: ip
-  defp format_ip(ip) when is_tuple(ip), do: ip |> :inet.ntoa() |> to_string()
+  defp validate!(options, key, valid?, expected) do
+    value = options[key]
+
+    if valid?.(value) do
+      options
+    else
+      raise ArgumentError,
+            "Hcaptcha.verify/2: #{inspect(key)} must be #{expected}, got: #{inspect(value)}"
+    end
+  end
+
+  defp validate_ip!(nil), do: nil
+  defp validate_ip!(ip) when is_binary(ip), do: ip
+
+  defp validate_ip!(ip) when is_tuple(ip) do
+    case :inet.ntoa(ip) do
+      {:error, _reason} -> raise_bad_ip(ip)
+      charlist -> to_string(charlist)
+    end
+  end
+
+  defp validate_ip!(ip), do: raise_bad_ip(ip)
+
+  defp raise_bad_ip(ip) do
+    raise ArgumentError,
+          "Hcaptcha.verify/2: :remote_ip must be a string or an :inet address tuple, got: #{inspect(ip)}"
+  end
+
+  defp request_body(token, secret, options) do
+    [secret: secret, response: token, remoteip: options[:remote_ip], sitekey: options[:sitekey]]
+    |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+    |> URI.encode_query()
+  end
 
   defp map_result({:ok, %{"success" => true} = body}) do
     {:ok,

@@ -11,12 +11,11 @@ defmodule Hcaptcha.Http.MockClientTest do
 
     assert {:ok,
             %{"success" => true, "credit" => false, "challenge_ts" => ts, "hostname" => host}} =
-             MockClient.request_verification(request, timeout: 10)
+             MockClient.request_verification(request)
 
     assert {:ok, _, _} = DateTime.from_iso8601(ts)
     assert host == "dummy-key-pass"
     assert ts =~ ~r/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/
-    assert_received {:request_verification, ^request, [timeout: 10]}
   end
 
   test "rejects another token with the test secret" do

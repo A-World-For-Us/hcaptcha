@@ -3,11 +3,13 @@ defmodule HcaptchaTest do
 
   alias Hcaptcha.Http
   alias Hcaptcha.Http.MockClient
+  alias Hcaptcha.RecordingClient
   alias Hcaptcha.Response
+  alias Hcaptcha.TestAdapter
   alias Hcaptcha.TestKeys
 
   setup do
-    keys = [:http_client, :secret]
+    keys = [:http_client, :secret, :timeout]
     original = Map.new(keys, &{&1, Application.fetch_env(:hcaptcha, &1)})
 
     on_exit(fn ->
@@ -20,41 +22,22 @@ defmodule HcaptchaTest do
     end)
   end
 
-  defp use_mock, do: Application.put_env(:hcaptcha, :http_client, MockClient)
+  defp use_client(client), do: Application.put_env(:hcaptcha, :http_client, client)
 
   defp stub_api(body) do
     test_pid = self()
 
     Req.Test.stub(Http, fn conn ->
       {:ok, raw, conn} = Plug.Conn.read_body(conn)
-      send(test_pid, {:api_request, raw})
+      send(test_pid, {:api_request, URI.decode_query(raw)})
       Req.Test.json(conn, body)
     end)
-  end
-
-  describe "public_key/0" do
-    setup do
-      original = Application.fetch_env!(:hcaptcha, :public_key)
-      on_exit(fn -> Application.put_env(:hcaptcha, :public_key, original) end)
-    end
-
-    test "returns the configured sitekey" do
-      Application.put_env(:hcaptcha, :public_key, "abc")
-
-      assert Hcaptcha.public_key() == "abc"
-    end
-
-    test "returns nil when unset" do
-      Application.delete_env(:hcaptcha, :public_key)
-
-      assert Hcaptcha.public_key() == nil
-    end
   end
 
   describe "missing token" do
     for token <- [nil, "", 123, %{}, :atom] do
       test "#{inspect(token)} returns :missing_input_response without a request" do
-        use_mock()
+        use_client(RecordingClient)
 
         assert {:error, [:missing_input_response]} = Hcaptcha.verify(unquote(Macro.escape(token)))
         refute_received {:request_verification, _, _}
@@ -62,9 +45,32 @@ defmodule HcaptchaTest do
     end
   end
 
+  describe "missing secret" do
+    for client <- [Http, MockClient, RecordingClient], secret <- [nil, "", 42, :atom] do
+      test "#{inspect(secret)} with #{inspect(client)} returns :missing_input_secret, no request" do
+        use_client(unquote(client))
+        Application.put_env(:hcaptcha, :secret, unquote(secret))
+
+        assert {:error, [:missing_input_secret]} = Hcaptcha.verify("token")
+        refute_received {:request_verification, _, _}
+      end
+    end
+
+    test "the secret option replaces a missing configured secret" do
+      Application.delete_env(:hcaptcha, :secret)
+      stub_api(%{"success" => true})
+
+      assert {:ok, _} = Hcaptcha.verify("token", secret: "0xabc")
+    end
+
+    test "a non-binary secret option is missing, even when the config has a secret" do
+      assert {:error, [:missing_input_secret]} = Hcaptcha.verify("token", secret: 42)
+    end
+  end
+
   describe "with the mock client" do
     setup do
-      use_mock()
+      use_client(MockClient)
     end
 
     test "the test token with the test secret succeeds" do
@@ -84,57 +90,102 @@ defmodule HcaptchaTest do
                Hcaptcha.verify(TestKeys.token(), secret: "0xabc")
     end
 
-    test "a missing secret reaches the mock, which refuses it" do
-      Application.delete_env(:hcaptcha, :secret)
+    test "sends no message to the caller" do
+      Hcaptcha.verify(TestKeys.token())
 
-      assert {:error, [:mock_requires_test_secret]} = Hcaptcha.verify(TestKeys.token())
+      refute_received _
+    end
+  end
+
+  describe "request" do
+    test "has the configured secret and the token" do
+      stub_api(%{"success" => true})
+      Application.put_env(:hcaptcha, :secret, "configured")
+
+      Hcaptcha.verify("token")
+
+      assert_received {:api_request, params}
+      assert params == %{"secret" => "configured", "response" => "token"}
     end
 
-    test "the configured secret and token are in the request body" do
-      token = TestKeys.token()
-      secret = TestKeys.secret()
-      Hcaptcha.verify(token)
+    test "has the secret option instead of the configured secret" do
+      stub_api(%{"success" => true})
 
-      assert_received {:request_verification, body, []}
-      assert URI.decode_query(body) == %{"secret" => secret, "response" => token}
+      Hcaptcha.verify("token", secret: "0xabc")
+
+      assert_received {:api_request, %{"secret" => "0xabc"}}
     end
 
-    test "the secret option overrides the configured secret" do
-      Hcaptcha.verify(TestKeys.token(), secret: "0xabc")
+    test "sends remote_ip as remoteip, from a string or a tuple" do
+      stub_api(%{"success" => true})
 
-      assert_received {:request_verification, body, _}
-      assert %{"secret" => "0xabc"} = URI.decode_query(body)
+      Hcaptcha.verify("token", remote_ip: "192.168.1.1")
+      assert_received {:api_request, %{"remoteip" => "192.168.1.1"}}
+
+      Hcaptcha.verify("token", remote_ip: {10, 0, 0, 1})
+      assert_received {:api_request, %{"remoteip" => "10.0.0.1"}}
+
+      Hcaptcha.verify("token", remote_ip: {0, 0, 0, 0, 0, 0, 0, 1})
+      assert_received {:api_request, %{"remoteip" => "::1"}}
     end
 
-    test "the timeout option is passed to the client" do
-      Hcaptcha.verify(TestKeys.token(), timeout: 25_000)
+    test "sends the sitekey when given" do
+      stub_api(%{"success" => true})
+
+      Hcaptcha.verify("token", sitekey: TestKeys.sitekey())
+
+      assert_received {:api_request, %{"sitekey" => sitekey}}
+      assert sitekey == TestKeys.sitekey()
+    end
+
+    test "does not send unsupported options" do
+      stub_api(%{"success" => true})
+
+      Hcaptcha.verify("token", unsupported_option: "x")
+
+      assert_received {:api_request, params}
+      assert Enum.sort(Map.keys(params)) == ["response", "secret"]
+    end
+
+    test "passes the timeout option to the client" do
+      use_client(RecordingClient)
+
+      Hcaptcha.verify("token", timeout: 25_000)
 
       assert_received {:request_verification, _, [timeout: 25_000]}
     end
 
-    test "remote_ip is sent as remoteip, from a string or a tuple" do
-      Hcaptcha.verify(TestKeys.token(), remote_ip: "192.168.1.1")
-      assert_received {:request_verification, body, _}
-      assert %{"remoteip" => "192.168.1.1"} = URI.decode_query(body)
+    test "uses the configured timeout when the option is absent" do
+      Application.put_env(:hcaptcha, :timeout, 4321)
 
-      Hcaptcha.verify(TestKeys.token(), remote_ip: {10, 0, 0, 1})
-      assert_received {:request_verification, body, _}
-      assert %{"remoteip" => "10.0.0.1"} = URI.decode_query(body)
+      TestAdapter.install(fn request ->
+        send(self(), {:receive_timeout, request.options.receive_timeout})
+        {request, Req.Response.new(status: 200, body: ~s({"success":true}))}
+      end)
+
+      assert {:ok, _} = Hcaptcha.verify("token")
+      assert_received {:receive_timeout, 4321}
+
+      assert {:ok, _} = Hcaptcha.verify("token", timeout: 99)
+      assert_received {:receive_timeout, 99}
+    end
+  end
+
+  describe "bad options" do
+    test "raise ArgumentError" do
+      for {option, message} <- [
+            {[remote_ip: {1, 2}], ":remote_ip"},
+            {[remote_ip: 42], ":remote_ip"},
+            {[sitekey: 42], ":sitekey"},
+            {[timeout: -1], ":timeout"},
+            {[timeout: "5"], ":timeout"}
+          ] do
+        assert_raise ArgumentError, ~r/#{message}/, fn -> Hcaptcha.verify("token", option) end
+      end
     end
 
-    test "sitekey is sent when given" do
-      Hcaptcha.verify(TestKeys.token(), sitekey: TestKeys.sitekey())
-
-      assert_received {:request_verification, body, _}
-      assert %{"sitekey" => sitekey} = URI.decode_query(body)
-      assert sitekey == TestKeys.sitekey()
-    end
-
-    test "unsupported options are not sent" do
-      Hcaptcha.verify(TestKeys.token(), unsupported_option: "x")
-
-      assert_received {:request_verification, body, _}
-      assert Map.keys(URI.decode_query(body)) |> Enum.sort() == ["response", "secret"]
+    test "are not checked when the token is missing" do
+      assert {:error, [:missing_input_response]} = Hcaptcha.verify(nil, sitekey: 42)
     end
   end
 
@@ -148,9 +199,6 @@ defmodule HcaptchaTest do
 
       assert {:ok, %Response{challenge_ts: "2026-01-01T00:00:00Z", hostname: "a.b"}} =
                Hcaptcha.verify("token")
-
-      assert_received {:api_request, raw}
-      assert %{"response" => "token", "secret" => _} = URI.decode_query(raw)
     end
 
     test "a success body without hostname does not crash" do
@@ -172,6 +220,8 @@ defmodule HcaptchaTest do
         {"missing-remoteip", :missing_remoteip},
         {"invalid-remoteip", :invalid_remoteip},
         {"not-using-dummy-passcode", :not_using_dummy_passcode},
+        {"not-using-dummy-secret", :not_using_dummy_passcode},
+        {"not-using-secret-key", :not_using_secret_key},
         {"sitekey-secret-mismatch", :sitekey_secret_mismatch},
         {"something-new", :unknown_error}
       ]
@@ -214,36 +264,29 @@ defmodule HcaptchaTest do
 
       assert {:error, [:timeout]} = Hcaptcha.verify("token")
     end
-
-    test "a missing secret returns :missing_input_secret without a request" do
-      Application.delete_env(:hcaptcha, :secret)
-      stub_api(%{"success" => true})
-
-      assert {:error, [:missing_input_secret]} = Hcaptcha.verify("token")
-      refute_received {:api_request, _}
-
-      Application.put_env(:hcaptcha, :secret, "")
-      assert {:error, [:missing_input_secret]} = Hcaptcha.verify("token")
-      refute_received {:api_request, _}
-    end
-
-    test "a secret option replaces a missing configured secret" do
-      Application.delete_env(:hcaptcha, :secret)
-      stub_api(%{"success" => true})
-
-      assert {:ok, _} = Hcaptcha.verify("token", secret: "0xabc")
-    end
   end
 
   describe "custom client" do
-    defmodule BadClient do
+    defmodule EmptyErrorClient do
       @behaviour Hcaptcha.HttpClient
       @impl true
       def request_verification(_body, _options), do: {:error, []}
     end
 
+    defmodule FailingClient do
+      @behaviour Hcaptcha.HttpClient
+      @impl true
+      def request_verification(_body, _options), do: {:error, [:boom]}
+    end
+
+    test "its error atoms are returned" do
+      use_client(FailingClient)
+
+      assert {:error, [:boom]} = Hcaptcha.verify("token")
+    end
+
     test "an empty error list returns :unexpected_response" do
-      Application.put_env(:hcaptcha, :http_client, BadClient)
+      use_client(EmptyErrorClient)
 
       assert {:error, [:unexpected_response]} = Hcaptcha.verify("token")
     end

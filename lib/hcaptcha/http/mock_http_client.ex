@@ -8,7 +8,7 @@ defmodule Hcaptcha.Http.MockClient do
 
     * test secret and test token: success
     * test secret and any other token: `invalid-input-response`
-    * any other secret, or none: `{:error, [:mock_requires_test_secret]}`
+    * any other secret: `{:error, [:mock_requires_test_secret]}`
 
   The last rule makes it safe to configure in any environment. A real secret
   never validates a token through the mock, so a mock left in production
@@ -16,8 +16,11 @@ defmodule Hcaptcha.Http.MockClient do
   real API also accepts the test token, so the mock is never more permissive
   than `Hcaptcha.Http`.
 
-  Each call sends `{:request_verification, body, options}` to the calling
-  process, so tests can assert on the request.
+  `Hcaptcha.verify/2` returns `{:error, [:missing_input_secret]}` before it calls
+  any client when no secret is set, so the mock never sees an empty secret. The
+  `:secret` option of `verify/2` takes precedence over the config, here too.
+  The mock sends no message and records nothing, so a mock installed by mistake
+  does not disturb the calling process.
 
       config :hcaptcha,
         http_client: Hcaptcha.Http.MockClient,
@@ -29,9 +32,7 @@ defmodule Hcaptcha.Http.MockClient do
   alias Hcaptcha.TestKeys
 
   @impl Hcaptcha.HttpClient
-  def request_verification(body, options \\ []) do
-    send(self(), {:request_verification, body, options})
-
+  def request_verification(body, _options \\ []) do
     params = URI.decode_query(body)
     test_secret = TestKeys.secret()
     test_token = TestKeys.token()
