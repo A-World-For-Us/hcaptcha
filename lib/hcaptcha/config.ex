@@ -1,18 +1,15 @@
 defmodule Hcaptcha.Config do
   @moduledoc """
-  Provides application/system environment variable lookup at runtime
+  Reads application configuration at runtime.
+
+  Values are plain terms. Set them in `config/runtime.exs`.
   """
 
   @doc """
-  Returns the requested variable
+  Returns the value of `key` for `application`, or `default`.
   """
   @spec get_env(atom, atom, any) :: any
   def get_env(application, key, default \\ nil) do
-    application
-    |> Application.get_env(key, default)
-    |> _get_env()
+    Application.get_env(application, key, default)
   end
-
-  defp _get_env({:system, env_variable}), do: System.get_env(env_variable)
-  defp _get_env(value), do: value
 end
