@@ -31,10 +31,33 @@ defmodule Hcaptcha.Http.MockClientTest do
     assert {:error, [:mock_requires_test_secret]} = MockClient.request_verification(request)
   end
 
-  test "refuses the old reCAPTCHA secret and its magic token" do
-    request = body(secret: "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe", response: "valid_response")
+  test "accepts valid_response with the test secret" do
+    request = body(secret: TestKeys.secret(), response: "valid_response")
 
-    assert {:error, [:mock_requires_test_secret]} = MockClient.request_verification(request)
+    assert {:ok, %{"success" => true}} = MockClient.request_verification(request)
+  end
+
+  test "rejects invalid_response with the test secret" do
+    request = body(secret: TestKeys.secret(), response: "invalid_response")
+
+    assert {:ok, %{"success" => false, "error-codes" => ["invalid-input-response"]}} =
+             MockClient.request_verification(request)
+  end
+
+  test "refuses both aliases with a real secret" do
+    for token <- ["valid_response", "invalid_response"] do
+      request = body(secret: "0xRealSecret", response: token)
+
+      assert {:error, [:mock_requires_test_secret]} = MockClient.request_verification(request)
+    end
+  end
+
+  test "refuses the old reCAPTCHA secret with every token" do
+    for token <- ["valid_response", "invalid_response", TestKeys.token()] do
+      request = body(secret: "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe", response: token)
+
+      assert {:error, [:mock_requires_test_secret]} = MockClient.request_verification(request)
+    end
   end
 
   test "refuses a request without a secret" do
