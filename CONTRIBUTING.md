@@ -23,8 +23,8 @@ Checks to run before you open a pull request:
 
 1. `mix format --check-formatted`
 2. `mix compile --warnings-as-errors`
-3. `mix test`
-4. `mix credo --strict`
+3. `mix test --warnings-as-errors`
+4. `mix credo`
 5. `mix dialyzer` (the first run builds the PLTs and is slow)
 
 `.git-blame-ignore-revs` lists commits that only change formatting. To skip them in `git blame`:
