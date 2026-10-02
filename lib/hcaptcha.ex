@@ -11,8 +11,8 @@ defmodule Hcaptcha do
     * `:secret` - the account secret
     * `:public_key` - the sitekey, read by `Hcaptcha.Template`
     * `:http_client` - a `Hcaptcha.HttpClient` (default `Hcaptcha.Http`)
-    * `:verify_url` - default `https://api.hcaptcha.com/siteverify`
-    * `:timeout` - request timeout in ms (default 5000)
+
+  `Hcaptcha.Http` lists the transport keys: `:verify_url`, `:timeout` and `:req_options`.
 
   ## Error atoms
 
@@ -66,11 +66,8 @@ defmodule Hcaptcha do
 
   A `nil`, empty or non-binary token returns `{:error, [:missing_input_response]}`
   without a request. A missing, empty or non-binary secret returns
-  `{:error, [:missing_input_secret]}` without a request, with any client.
-
-  A token that the API refuses returns one of `:invalid_input_response`,
-  `:expired_input_response`, `:already_seen_response` or
-  `:sitekey_secret_mismatch`. See the module doc for all atoms.
+  `{:error, [:missing_input_secret]}` without a request, with any client. The module doc lists
+  every error atom.
 
   ## Options
 

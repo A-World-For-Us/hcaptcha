@@ -16,12 +16,6 @@ defmodule Hcaptcha.Http.MockClient do
   real API also accepts the test token, so the mock is never more permissive
   than `Hcaptcha.Http`.
 
-  `Hcaptcha.verify/2` returns `{:error, [:missing_input_secret]}` before it calls
-  any client when no secret is set, so the mock never sees an empty secret. The
-  `:secret` option of `verify/2` takes precedence over the config, here too.
-  The mock sends no message and records nothing, so a mock installed by mistake
-  does not disturb the calling process.
-
       config :hcaptcha,
         http_client: Hcaptcha.Http.MockClient,
         secret: Hcaptcha.TestKeys.secret()

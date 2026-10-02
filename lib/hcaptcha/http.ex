@@ -46,9 +46,8 @@ defmodule Hcaptcha.Http do
 
   ## Options
 
-    * `:timeout` - in ms. Sets the connect timeout and the receive timeout
-      (the longest wait for the next piece of the answer). The whole request
-      can take longer than this value.
+    * `:timeout` - in ms. Sets the connect timeout and the receive timeout. The receive timeout
+      limits each wait for data, so the whole request can take longer than this value.
   """
   @impl Hcaptcha.HttpClient
   def request_verification(body, options \\ []) do

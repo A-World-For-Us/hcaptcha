@@ -2,8 +2,7 @@ defmodule Hcaptcha.TestKeys do
   @moduledoc """
   The hCaptcha [test keys](https://docs.hcaptcha.com/#integration-testing-test-keys).
 
-  The real API accepts `token/0` when the request uses `secret/0`, and
-  `Hcaptcha.Http.MockClient` copies that behaviour offline.
+  The real API accepts `token/0` when the request uses `secret/0`.
   """
 
   @doc "Test sitekey. Renders a widget that always passes."
