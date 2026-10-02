@@ -37,7 +37,9 @@ All keys are read at runtime. `{:system, "VAR"}` tuples are not supported.
 | `timeout`     | Default for the `timeout` option of `verify/2`, in ms      | `5000`                               |
 | `req_options` | Transport options passed to `Req.new/1` (proxy, pool, test `plug`) | `[]`                                 |
 
-The JSON library is Jason, through Req. The `:json_library` option no longer exists.
+`Hcaptcha.Http` decodes the answer with Jason. The `:json_library` option no longer exists.
+
+`req_options` can set transport options such as `connect_options` (proxy), `finch` (pool), `adapter` and `plug`. The library owns `method`, `url`, `body`, `headers`, `retry`, `redirect`, `decode_body`, `into` and `receive_timeout`; your values for those are ignored. Requests are never retried and redirects are not followed.
 
 ## Usage
 
@@ -102,18 +104,20 @@ end
 - `{:ok, %Hcaptcha.Response{challenge_ts: timestamp, hostname: host}}` when the token is valid.
 - `{:error, errors}` with a list of atoms.
 
-A `nil`, empty or non-string token returns `{:error, [:missing_input_response]}` and sends no request. A token that the API rejects returns `{:error, [:invalid_input_response]}`. This lets you tell a missing token from a bad one.
+A `nil`, empty or non-string token returns `{:error, [:missing_input_response]}` and sends no request. A missing or non-string secret returns `{:error, [:missing_input_secret]}` and sends no request, with every client. A token that the API refuses returns `{:error, [:invalid_input_response]}`, `[:expired_input_response]`, `[:already_seen_response]` or `[:sitekey_secret_mismatch]`. This lets you tell a missing token from a bad one.
+
+A bad option value (`remote_ip: {1, 2}`, a `sitekey` that is not a string, a negative `timeout`) is a programming error and raises `ArgumentError`.
 
 Options:
 
 | Option      | Action                                                                  | Default                |
 | :---------- | :---------------------------------------------------------------------- | :--------------------- |
 | `timeout`   | Connect timeout and receive timeout, in ms (see below)                  | `:timeout` from config, else `5000` |
-| `secret`    | Secret sent with the request                                            | `:secret` from config  |
+| `secret`    | Secret sent with the request. Takes precedence over the config, with the mock too | `:secret` from config  |
 | `remote_ip` | The user's IP address, as a string or an `:inet` tuple. Sent as `remoteip` | none                |
 | `sitekey`   | The sitekey the token must belong to                                    | none                   |
 
-`timeout` applies to the connection and to each wait for data from the API, so a request can take longer than this value in total. There is no retry.
+`timeout` applies to the connection and to each wait for data from the API, so a request can take longer than this value in total. A failed request is not retried.
 
 ### Errors
 
@@ -129,6 +133,7 @@ Options:
 | `:bad_request` | The API reports a malformed request |
 | `:missing_remoteip`, `:invalid_remoteip` | Problem with the `remote_ip` option |
 | `:not_using_dummy_passcode` | A test sitekey was used with a secret that is not the test secret |
+| `:not_using_secret_key` | Code `not-using-secret-key`, not in the hCaptcha table |
 | `:sitekey_secret_mismatch` | The sitekey does not belong to the secret |
 | `:unknown_error` | The API sent an error code this library does not know |
 | `:challenge_failed` | The API answered `success: false` with no error code |
@@ -159,9 +164,9 @@ config :hcaptcha,
 {:error, [:invalid_input_response]} = Hcaptcha.verify("anything else")
 ```
 
-The mock never calls the network. It accepts only the test token and only with the test secret. With any other secret it returns `{:error, [:mock_requires_test_secret]}`, so a mock left in production rejects every user and lets nobody through. The mock sends `{:request_verification, body, options}` to the calling process, so a test can use `assert_received` on the request.
+The mock never calls the network. It accepts only the test token and only with the test secret. With any other secret it returns `{:error, [:mock_requires_test_secret]}`, so a mock left in production rejects every user and lets nobody through. The mock records nothing and sends no message. To check the request body, stub the API with `Req.Test` (below).
 
-To stub the API itself, use `Req.Test`:
+To stub the API itself, use `Req.Test`. It needs `{:plug, "~> 1.16", only: :test}` in your own dependencies:
 
 ```elixir
 config :hcaptcha, req_options: [plug: {Req.Test, Hcaptcha.Http}]

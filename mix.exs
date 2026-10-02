@@ -22,7 +22,8 @@ defmodule Hcaptcha.Mixfile do
         # Put the project-level PLT in the priv/ directory (instead of the default _build/ location)
         # for the CI to be able to cache it between builds
         plt_local_path: "priv/plts/project.plt",
-        plt_core_path: "priv/plts/core.plt"
+        plt_core_path: "priv/plts/core.plt",
+        plt_add_apps: [:ex_unit]
       ]
     ]
   end
