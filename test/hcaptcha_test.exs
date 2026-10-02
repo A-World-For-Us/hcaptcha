@@ -221,7 +221,6 @@ defmodule HcaptchaTest do
         {"invalid-remoteip", :invalid_remoteip},
         {"not-using-dummy-passcode", :not_using_dummy_passcode},
         {"not-using-dummy-secret", :not_using_dummy_passcode},
-        {"not-using-secret-key", :not_using_secret_key},
         {"sitekey-secret-mismatch", :sitekey_secret_mismatch},
         {"something-new", :unknown_error}
       ]

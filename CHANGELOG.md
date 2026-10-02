@@ -29,7 +29,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `Hcaptcha.verify/2` returns `{:error, [:missing_input_response]}` for a `nil`, empty or non-string token, without a request. A server can now tell a missing token (script blocked) from an invalid one.
 - `Hcaptcha.verify/2` returns `{:error, [:missing_input_secret]}` without a request when no secret is configured.
 - `:sitekey` option of `verify/2`, and `:remote_ip` as an `:inet` tuple.
-- Error atoms: `:expired_input_response`, `:already_seen_response`, `:missing_remoteip`, `:invalid_remoteip`, `:unexpected_response`, `:invalid_response_body`, `:unexpected_status`, `:http_error`, `:not_using_secret_key`, `:mock_requires_test_secret`.
+- Error atoms: `:expired_input_response`, `:already_seen_response`, `:missing_remoteip`, `:invalid_remoteip`, `:unexpected_response`, `:invalid_response_body`, `:unexpected_status`, `:http_error`, `:mock_requires_test_secret`.
 - `Hcaptcha.HttpClient` behaviour, implemented by `Hcaptcha.Http` and `Hcaptcha.Http.MockClient`.
 - `Hcaptcha.TestKeys` with the hCaptcha test sitekey, secret and token.
 - `Hcaptcha.public_key/0` returns the configured sitekey.

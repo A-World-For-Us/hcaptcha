@@ -133,7 +133,6 @@ Options:
 | `:bad_request` | The API reports a malformed request |
 | `:missing_remoteip`, `:invalid_remoteip` | Problem with the `remote_ip` option |
 | `:not_using_dummy_passcode` | A test sitekey was used with a secret that is not the test secret |
-| `:not_using_secret_key` | Code `not-using-secret-key`, not in the hCaptcha table |
 | `:sitekey_secret_mismatch` | The sitekey does not belong to the secret |
 | `:unknown_error` | The API sent an error code this library does not know |
 | `:challenge_failed` | The API answered `success: false` with no error code |
