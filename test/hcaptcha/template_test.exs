@@ -18,7 +18,7 @@ defmodule Hcaptcha.TemplateTest do
           badge: "inline"
         )
 
-      assert html =~ ~s(class="h-captcha")
+      refute html =~ "class="
       assert html =~ ~s(data-sitekey="my_key")
       assert html =~ ~s(data-theme="dark")
       assert html =~ ~s(data-type="audio")
@@ -43,6 +43,11 @@ defmodule Hcaptcha.TemplateTest do
       refute html =~ "data-badge"
       refute html =~ "data-callback"
       refute html =~ ~s(="")
+    end
+
+    test "passes the class option through, escaped" do
+      assert Template.display(class: "my-captcha") =~ ~s|<div class="my-captcha" id=|
+      assert Template.display(class: "a\"b") =~ ~s|class="a&quot;b"|
     end
 
     test "gives each call a unique id" do

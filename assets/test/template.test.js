@@ -204,6 +204,24 @@ describe("invisible widget", () => {
     expect(p.sent).toHaveLength(1);
   });
 
+  it("shows other submit listeners only the final submit", () => {
+    const p = page(FORM);
+    const form = p.win.document.getElementById("f");
+    let onForm = 0;
+    let onDocument = 0;
+    form.addEventListener("submit", () => onForm++);
+    p.win.document.addEventListener("submit", () => onDocument++);
+    p.run({ id: "w1" });
+    p.loadApi();
+
+    p.submit();
+    expect([onForm, onDocument]).toEqual([0, 0]);
+
+    p.api.renders[0].options.callback("tok");
+    expect([onForm, onDocument]).toEqual([1, 1]);
+    expect(p.sent).toHaveLength(1);
+  });
+
   it("releases the guard on close and on challenge expiry", () => {
     const p = page(FORM);
     p.run({ id: "w1" });

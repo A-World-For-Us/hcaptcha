@@ -32,6 +32,7 @@ defmodule Hcaptcha.Template do
       hCaptcha API is ready, before the first widget that names it renders.
     * `:callback` - name of a global JavaScript function, called with the token when the
       challenge succeeds. In `"invisible"` mode the form is submitted after it returns.
+    * `:class` - CSS class of the container. The container has no class by default.
     * `:nonce` - CSP nonce, set on the inline script and on the script that loads the API.
 
   ## Invisible mode
@@ -50,6 +51,7 @@ defmodule Hcaptcha.Template do
 
     attributes =
       [
+        class: options[:class],
         id: id,
         "data-sitekey": options[:public_key] || Hcaptcha.public_key()
       ] ++
@@ -57,7 +59,7 @@ defmodule Hcaptcha.Template do
         if(invisible?, do: [], else: [{:"data-callback", options[:callback]}])
 
     container =
-      ~s(<div class="h-captcha"#{attributes(attributes)}></div>)
+      ~s(<div#{attributes(attributes)}></div>)
 
     config =
       "{id: #{js(id)}, invisible: #{invisible?}, src: #{js(api_url(options))}, " <>
