@@ -65,7 +65,9 @@ Invisible. The challenge runs when the form that contains the widget is submitte
 
 Several widgets can share one page, for example two invisible forms, or one invisible and one checkbox. The page loads the hCaptcha script once. The `hl` option of the first widget sets the language.
 
-If the hCaptcha script does not load, an invisible form submits without a token. `Hcaptcha.verify/2` then returns an error for the missing token.
+If the hCaptcha script fails to load, is not ready within 10 seconds, or cannot render the widget, an invisible form is sent without a token. `Hcaptcha.verify/2` then returns an error for the missing token. A submit made before the script has loaded waits for it. After the challenge, the form is sent again with the token and the clicked button.
+
+The template is for forms rendered by controllers. LiveView `phx-submit` forms are not supported: use the LiveView component and hook instead. Do not load `api.js` yourself on a page that uses `display/1`.
 
 `display/1` options:
 
