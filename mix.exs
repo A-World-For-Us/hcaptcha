@@ -18,8 +18,6 @@ defmodule Hcaptcha.Mixfile do
 
       # Dialyzer:
       dialyzer: [
-        list_unused_filters: true,
-        ignore_warnings: ".dialyzer_ignore.exs",
         # Put the project-level PLT in the priv/ directory (instead of the default _build/ location)
         # for the CI to be able to cache it between builds
         plt_local_path: "priv/plts/project.plt",
@@ -45,8 +43,9 @@ defmodule Hcaptcha.Mixfile do
 
   defp deps do
     [
-      {:httpoison, "~> 3.0"},
-      {:jason, "~> 1.4", optional: true},
+      {:req, "~> 0.5"},
+      {:jason, "~> 1.4"},
+      {:plug, "~> 1.16", only: :test},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.40", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: [:test], runtime: false}
