@@ -25,8 +25,8 @@ defmodule Hcaptcha.Template do
     * `:theme`, `:type`, `:tabindex`, `:size`, `:badge` - written as `data-*` attributes and
       passed to hCaptcha. Options that are `nil` are left out.
     * `:hl` - language of the widget. Only the first call on a page has an effect.
-    * `:onload` - name of a global JavaScript function, called without arguments when the
-      hCaptcha API is ready, before the widget renders.
+    * `:onload` - name of a global JavaScript function, called once without arguments when the
+      hCaptcha API is ready, before the first widget that names it renders.
     * `:callback` - name of a global JavaScript function, called with the token when the
       challenge succeeds. In `"invisible"` mode the form is submitted after it returns.
     * `:nonce` - CSP nonce, set on the inline script and on the script that loads the API.

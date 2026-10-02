@@ -73,7 +73,7 @@ If the hCaptcha script does not load, an invisible form submits without a token.
 | :----------- | :--------------------------------------------- | :----------------------- |
 | `public_key` | Sets the `data-sitekey` attribute              | `:public_key` from config |
 | `hl`         | Language of the widget                         | none, hCaptcha detects the language |
-| `onload`     | Name of a global JavaScript function, called without arguments when the hCaptcha script is ready | none |
+| `onload`     | Name of a global JavaScript function, called once without arguments when the hCaptcha script is ready, however many widgets use it | none |
 | `callback`   | Name of a global JavaScript function, called with the token on success. In invisible mode the form is submitted after it returns | none |
 | `nonce`      | CSP nonce, set on the inline script and on the script it adds | none |
 | `theme`, `type`, `tabindex`, `size`, `badge` | Set the matching `data-*` attributes | none |
