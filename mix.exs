@@ -14,7 +14,6 @@ defmodule Hcaptcha.Mixfile do
       description: description(),
       deps: deps(),
       docs: docs(),
-      package: package(),
       start_permanent: Mix.env() == :prod,
 
       # Dialyzer:
@@ -24,10 +23,7 @@ defmodule Hcaptcha.Mixfile do
         # Put the project-level PLT in the priv/ directory (instead of the default _build/ location)
         # for the CI to be able to cache it between builds
         plt_local_path: "priv/plts/project.plt",
-        plt_core_path: "priv/plts/core.plt",
-        # Add `:mix` to the list of apps to include in the PLT, allowing dialyzer to
-        # know about the `Mix` functions and `Mix.Task` behaviour
-        plt_add_apps: [:mix, :iex]
+        plt_core_path: "priv/plts/core.plt"
       ]
     ]
   end
@@ -62,18 +58,6 @@ defmodule Hcaptcha.Mixfile do
       main: "readme",
       extras: ["README.md", "CHANGELOG.md"],
       source_ref: "v#{@version}"
-    ]
-  end
-
-  defp package do
-    [
-      files: ["lib", "mix.exs", "README.md", "CHANGELOG.md", "LICENSE"],
-      maintainers: ["Antoine Bolvy"],
-      licenses: ["MIT"],
-      links: %{
-        "GitHub" => @source_url,
-        "Upstream" => "https://github.com/sebastiangrebe/hcaptcha"
-      }
     ]
   end
 end
