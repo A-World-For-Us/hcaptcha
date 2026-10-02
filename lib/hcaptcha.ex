@@ -39,7 +39,7 @@ defmodule Hcaptcha do
 
   ## Example
 
-    {:ok, api_response} = Hcaptcha.verify("response_string")
+        {:ok, api_response} = Hcaptcha.verify("response_string")
   """
   @spec verify(String.t(), Keyword.t()) ::
           {:ok, Response.t()} | {:error, [atom]}
