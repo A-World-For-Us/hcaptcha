@@ -11,12 +11,10 @@ Add the package to your dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:hcaptcha, github: "A-World-For-Us/hcaptcha", tag: "v0.2.0"}
+    {:hcaptcha, github: "A-World-For-Us/hcaptcha", branch: "master"}
   ]
 end
 ```
-
-`v0.2.0` is the first release from this fork's new line. Until it is tagged, use `branch: "master"`.
 
 ## Configuration
 
