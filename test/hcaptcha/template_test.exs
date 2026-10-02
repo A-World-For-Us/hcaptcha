@@ -121,6 +121,12 @@ defmodule Hcaptcha.TemplateTest do
       refute html =~ ~s|div[class="h-captcha"]|
     end
 
+    test "releases the guard when the challenge expires or closes" do
+      html = Template.display(size: "invisible")
+      assert html =~ ~s|"chalexpired-callback"|
+      assert html =~ ~s|"close-callback"|
+    end
+
     test "defines no global function other than hcaptchaOnload and hcaptchaLoader" do
       html = Template.display(size: "invisible")
 
