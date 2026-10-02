@@ -3,3 +3,8 @@ erl_crash.dump
 /deps
 /doc
 /cover
+/priv/plts
+*.ez
+hcaptcha-*.tar
+/tmp/
+node_modules/

@@ -1,27 +1,21 @@
 defmodule Hcaptcha.Mixfile do
   use Mix.Project
 
+  @version "0.1.0"
+  @source_url "https://github.com/A-World-For-Us/hcaptcha"
+
   def project do
     [
       app: :hcaptcha,
       name: "hcaptcha",
-      source_url: "https://github.com/A-World-For-Us/hcaptcha",
-      version: "0.1.0",
-      elixir: "~> 1.15",
+      source_url: @source_url,
+      version: @version,
+      elixir: "~> 1.17",
       description: description(),
       deps: deps(),
+      docs: docs(),
       package: package(),
-      build_embedded: Mix.env() == :prod,
       start_permanent: Mix.env() == :prod,
-
-      # Test coverage:
-      test_coverage: [tool: ExCoveralls],
-      preferred_cli_env: [
-        coveralls: :test,
-        "coveralls.detail": :test,
-        "coveralls.post": :test,
-        "coveralls.html": :test
-      ],
 
       # Dialyzer:
       dialyzer: [
@@ -54,23 +48,30 @@ defmodule Hcaptcha.Mixfile do
 
   defp deps do
     [
-      {:httpoison, "~> 2.1"},
+      {:httpoison, "~> 3.0"},
       {:jason, "~> 1.4", optional: true},
-      {:credo, "~> 1.7.1", only: [:dev, :test], runtime: false},
-      {:ex_doc, "0.40.4", only: :dev},
-      {:dialyxir, "~> 1.4.1", only: [:test], runtime: false},
-      {:excoveralls, "~> 0.18.3", only: :test}
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:ex_doc, "~> 0.40", only: :dev, runtime: false},
+      {:dialyxir, "~> 1.4", only: [:test], runtime: false}
+    ]
+  end
+
+  defp docs do
+    [
+      main: "readme",
+      extras: ["README.md", "CHANGELOG.md"],
+      source_ref: "v#{@version}"
     ]
   end
 
   defp package do
     [
-      files: ["lib", "mix.exs", "README.md", "LICENSE"],
+      files: ["lib", "mix.exs", "README.md", "CHANGELOG.md", "LICENSE"],
       maintainers: ["Antoine Bolvy"],
       licenses: ["MIT"],
       links: %{
-        "GitHub" => "https://github.com/Sebi55/hcaptcha",
-        "Forked" => "https://github.com/samueljseay/recaptcha"
+        "GitHub" => @source_url,
+        "Upstream" => "https://github.com/sebastiangrebe/hcaptcha"
       }
     ]
   end
