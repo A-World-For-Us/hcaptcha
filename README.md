@@ -35,7 +35,7 @@ All keys are read at runtime. `{:system, "VAR"}` tuples are not supported.
 | `http_client` | Module that implements `Hcaptcha.HttpClient`               | `Hcaptcha.Http`                      |
 | `verify_url`  | Siteverify endpoint                                        | `https://api.hcaptcha.com/siteverify` |
 | `timeout`     | Default for the `timeout` option of `verify/2`, in ms      | `5000`                               |
-| `req_options` | Extra options for `Req.request/1` (proxy, test `plug`)     | `[]`                                 |
+| `req_options` | Transport options passed to `Req.new/1` (proxy, pool, test `plug`) | `[]`                                 |
 
 The JSON library is Jason, through Req. The `:json_library` option no longer exists.
 

@@ -100,6 +100,12 @@ defmodule Hcaptcha do
 
   def verify(_token, _options), do: {:error, [:missing_input_response]}
 
+  @doc """
+  Returns the configured sitekey (`:public_key`), or `nil` when it is not set.
+  """
+  @spec public_key() :: String.t() | nil
+  def public_key, do: Application.get_env(:hcaptcha, :public_key)
+
   defp request_body(token, secret, options) do
     URI.encode_query(
       Enum.reject(

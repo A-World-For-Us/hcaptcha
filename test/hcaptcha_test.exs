@@ -32,6 +32,25 @@ defmodule HcaptchaTest do
     end)
   end
 
+  describe "public_key/0" do
+    setup do
+      original = Application.fetch_env!(:hcaptcha, :public_key)
+      on_exit(fn -> Application.put_env(:hcaptcha, :public_key, original) end)
+    end
+
+    test "returns the configured sitekey" do
+      Application.put_env(:hcaptcha, :public_key, "abc")
+
+      assert Hcaptcha.public_key() == "abc"
+    end
+
+    test "returns nil when unset" do
+      Application.delete_env(:hcaptcha, :public_key)
+
+      assert Hcaptcha.public_key() == nil
+    end
+  end
+
   describe "missing token" do
     for token <- [nil, "", 123, %{}, :atom] do
       test "#{inspect(token)} returns :missing_input_response without a request" do

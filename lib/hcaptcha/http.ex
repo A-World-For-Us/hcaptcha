@@ -6,7 +6,8 @@ defmodule Hcaptcha.Http do
 
     * `:verify_url` - defaults to `https://api.hcaptcha.com/siteverify`
     * `:timeout` - default timeout in ms (5000)
-    * `:req_options` - extra options for `Req.request/1`, for example
+    * `:req_options` - transport options merged into the `Req.new/1` options
+      (proxy, connection pool, ...), for example
       `[plug: {Req.Test, Hcaptcha.Http}]` to stub the API in tests
   """
 

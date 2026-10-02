@@ -11,7 +11,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Breaking:** HTTP requests use [Req](https://hex.pm/packages/req) instead of HTTPoison. This also removes `hackney` 1.x, which has known security advisories.
 - **Breaking:** the default verify URL is the documented `https://api.hcaptcha.com/siteverify`.
 - **Breaking:** `Hcaptcha.Http.MockClient` makes no network call and accepts only the hCaptcha test token with the test secret.
-- **Breaking:** `{:system, "VAR"}` config values are no longer read. Use `config/runtime.exs`. `Hcaptcha.Config.get_env/3` stays and returns the plain config value.
+- **Breaking:** `{:system, "VAR"}` config values are no longer read. Use `config/runtime.exs`.
+- **Breaking:** `Hcaptcha.Config` is removed. Use `Hcaptcha.public_key/0` or `Application.get_env/2`.
 - **Breaking:** `verify/2` sends the IP as `remoteip`, the parameter the API documents. It sent `remote_ip` before, which the API ignored.
 - **Breaking:** the `:json_library` compile-time option is gone. Jason is used through Req.
 - `Hcaptcha.verify/2` returns an error tuple for any API answer, JSON failure or transport failure. It raised a `CaseClauseError` on some of them.
@@ -25,11 +26,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Error atoms: `:expired_input_response`, `:already_seen_response`, `:missing_remoteip`, `:invalid_remoteip`, `:unexpected_response`, `:invalid_response_body`, `:unexpected_status`, `:http_error`, `:mock_requires_test_secret`.
 - `Hcaptcha.HttpClient` behaviour, implemented by `Hcaptcha.Http` and `Hcaptcha.Http.MockClient`.
 - `Hcaptcha.TestKeys` with the hCaptcha test sitekey, secret and token.
-- Config keys `:timeout`, `:verify_url` and `:req_options`, read at runtime.
+- `Hcaptcha.public_key/0` returns the configured sitekey.
+- Config keys `:timeout`, `:verify_url` and `:req_options` (transport options for `Req.new/1`), read at runtime.
 
 ### Removed
 
-- HTTPoison, the `{:system, _}` config tuples and the `:json_library` option.
+- HTTPoison, `Hcaptcha.Config`, the `{:system, _}` config tuples and the `:json_library` option.
 - The mock tokens `valid_response` and `invalid_response`, and the reCAPTCHA test secret in the mock.
 - The mock's fall-through to the real API for unknown tokens.
 
@@ -83,7 +85,17 @@ The library no longer sets `public_key` or `secret` itself. Without a secret, `v
 
 #### `Hcaptcha.Config`
 
-`Hcaptcha.Config.get_env/3` is unchanged for plain values, for example `Hcaptcha.Config.get_env(:hcaptcha, :public_key)`. It returns a `{:system, _}` tuple as it is, so replace those tuples as above.
+The module is removed. Replace the calls:
+
+```elixir
+# before
+Hcaptcha.Config.get_env(:hcaptcha, :public_key)
+Hcaptcha.Config.get_env(:hcaptcha, :other_key)
+
+# after
+Hcaptcha.public_key()
+Application.get_env(:hcaptcha, :other_key)
+```
 
 #### HTTPoison
 
