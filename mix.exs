@@ -20,6 +20,7 @@ defmodule Hcaptcha.Mixfile do
       # Dialyzer:
       dialyzer: [
         list_unused_filters: true,
+        ignore_warnings: ".dialyzer_ignore.exs",
         # Put the project-level PLT in the priv/ directory (instead of the default _build/ location)
         # for the CI to be able to cache it between builds
         plt_local_path: "priv/plts/project.plt",
