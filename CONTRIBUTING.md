@@ -27,7 +27,7 @@ Checks to run before you open a pull request:
 4. `mix credo --strict`
 5. `mix dialyzer` (the first run builds the PLTs and is slow)
 
-To ignore the bulk formatting commit in `git blame`:
+`.git-blame-ignore-revs` lists commits that only change formatting. To skip them in `git blame`:
 
 ```
 git config blame.ignoreRevsFile .git-blame-ignore-revs
