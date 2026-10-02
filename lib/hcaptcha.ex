@@ -57,12 +57,10 @@ defmodule Hcaptcha do
       {:ok, %{"success" => false, "error-codes" => errors}} ->
         {:error, Enum.map(errors, &atomise_api_error/1)}
 
-      {:ok,
-       %{"success" => true, "challenge_ts" => timestamp, "hostname" => host}} ->
+      {:ok, %{"success" => true, "challenge_ts" => timestamp, "hostname" => host}} ->
         {:ok, %Response{challenge_ts: timestamp, hostname: host}}
 
-      {:ok,
-       %{"success" => false, "challenge_ts" => _timestamp, "hostname" => _host}} ->
+      {:ok, %{"success" => false, "challenge_ts" => _timestamp, "hostname" => _host}} ->
         {:error, [:challenge_failed]}
     end
   end

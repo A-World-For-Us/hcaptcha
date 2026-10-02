@@ -24,8 +24,7 @@ defmodule HcaptchaTest do
   test "When secret is not overridden the configured secret is used" do
     Hcaptcha.verify("valid_response")
 
-    assert_received {:request_verification,
-                     "response=valid_response&secret=test_secret", _}
+    assert_received {:request_verification, "response=valid_response&secret=test_secret", _}
   end
 
   test "When the timeout is overridden that config is passed to verify/2 as an option" do
@@ -38,14 +37,12 @@ defmodule HcaptchaTest do
     Hcaptcha.verify("valid_response", remote_ip: "192.168.1.1")
 
     assert_received {:request_verification,
-                     "response=valid_response&secret=test_secret&remote_ip=192.168.1.1",
-                     _}
+                     "response=valid_response&secret=test_secret&remote_ip=192.168.1.1", _}
   end
 
   test "Adding unsupported options does not append them to the request body" do
     Hcaptcha.verify("valid_response", unsupported_option: "not_valid")
 
-    assert_received {:request_verification,
-                     "response=valid_response&secret=test_secret", _}
+    assert_received {:request_verification, "response=valid_response&secret=test_secret", _}
   end
 end
