@@ -11,6 +11,7 @@ defmodule Hcaptcha.Mixfile do
       source_url: @source_url,
       version: @version,
       elixir: "~> 1.17",
+      elixirc_paths: elixirc_paths(Mix.env()),
       description: description(),
       deps: deps(),
       docs: docs(),
@@ -18,12 +19,11 @@ defmodule Hcaptcha.Mixfile do
 
       # Dialyzer:
       dialyzer: [
-        list_unused_filters: true,
-        ignore_warnings: ".dialyzer_ignore.exs",
         # Put the project-level PLT in the priv/ directory (instead of the default _build/ location)
         # for the CI to be able to cache it between builds
         plt_local_path: "priv/plts/project.plt",
-        plt_core_path: "priv/plts/core.plt"
+        plt_core_path: "priv/plts/core.plt",
+        plt_add_apps: [:ex_unit]
       ]
     ]
   end
@@ -43,10 +43,14 @@ defmodule Hcaptcha.Mixfile do
     """
   end
 
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_env), do: ["lib"]
+
   defp deps do
     [
-      {:httpoison, "~> 3.0"},
-      {:jason, "~> 1.4", optional: true},
+      {:req, "~> 0.7"},
+      {:jason, "~> 1.4"},
+      {:plug, "~> 1.16", only: :test},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.40", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: [:test], runtime: false}
