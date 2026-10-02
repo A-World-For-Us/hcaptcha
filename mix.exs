@@ -11,6 +11,7 @@ defmodule Hcaptcha.Mixfile do
       source_url: @source_url,
       version: @version,
       elixir: "~> 1.17",
+      elixirc_paths: elixirc_paths(Mix.env()),
       description: description(),
       deps: deps(),
       docs: docs(),
@@ -41,9 +42,12 @@ defmodule Hcaptcha.Mixfile do
     """
   end
 
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_env), do: ["lib"]
+
   defp deps do
     [
-      {:req, "~> 0.5"},
+      {:req, "~> 0.7"},
       {:jason, "~> 1.4"},
       {:plug, "~> 1.16", only: :test},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
