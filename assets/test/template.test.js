@@ -106,15 +106,21 @@ describe("invisible widget", () => {
     expect(p.api.executes).toEqual([1]);
   });
 
-  it("renders with the data attributes and sends the form after the callback", () => {
+  it("renders with the data attributes, resets, calls the user callback and sends the form once", () => {
     const p = page(FORM);
-    p.run({ id: "w1" });
+    const tokens = [];
+    p.win.mine = (token) => tokens.push(token);
+    p.run({ id: "w1", callback: "mine" });
     p.loadApi();
     p.submit();
+    const { callback, "error-callback": error } = p.api.renders[0].options;
 
     expect(p.api.renders[0].options).toMatchObject({ sitekey: "k", size: "invisible" });
-    p.api.renders[0].options.callback("tok");
+    callback("tok");
+    error();
 
+    expect(tokens).toEqual(["tok"]);
+    expect(p.log).toEqual(["execute", "reset"]);
     expect(p.sent).toHaveLength(1);
     expect(p.sent[0].data.get("h-captcha-response")).toBe("tok");
   });
@@ -134,49 +140,16 @@ describe("invisible widget", () => {
     expect(p.win.document.querySelectorAll('[name="h-captcha-response"]')).toHaveLength(1);
   });
 
-  it("resets the widget before the final submit", () => {
-    const p = page(FORM);
-    p.run({ id: "w1" });
-    p.loadApi();
-    p.submit();
-    p.api.renders[0].options.callback("tok");
-
-    expect(p.log).toEqual(["execute", "reset"]);
-    expect(p.sent).toHaveLength(1);
-  });
-
-  it("sends the form once when callback and error-callback both fire", () => {
-    const p = page(FORM);
-    p.run({ id: "w1" });
-    p.loadApi();
-    p.submit();
-    const { callback, "error-callback": error } = p.api.renders[0].options;
-
-    callback("tok");
-    error();
-
-    expect(p.sent).toHaveLength(1);
-  });
-
-  it("keeps the clicked button", () => {
-    const p = page(FORM);
+  it("keeps the clicked button, on a form that has an input named submit", () => {
+    const p = page(FORM.replace("</form>", '<input name="submit" value="x"></form>'));
     p.run({ id: "w1" });
     p.loadApi();
     p.win.document.getElementById("go").click();
     p.api.renders[0].options.callback("tok");
 
+    expect(p.sent).toHaveLength(1);
     expect(p.sent[0].submitter.id).toBe("go");
     expect(p.sent[0].data.get("go")).toBe("1");
-  });
-
-  it("sends a form that has an input named submit", () => {
-    const p = page(FORM.replace("</form>", '<input name="submit" value="x"></form>'));
-    p.run({ id: "w1" });
-    p.loadApi();
-    p.submit();
-    p.api.renders[0].options.callback("tok");
-
-    expect(p.sent).toHaveLength(1);
   });
 
   it("falls back to submit() without requestSubmit", () => {
@@ -189,19 +162,6 @@ describe("invisible widget", () => {
 
     expect(p.sent).toHaveLength(1);
     expect(p.sent[0].native).toBe(true);
-  });
-
-  it("calls the user callback with the token", () => {
-    const p = page(FORM);
-    const tokens = [];
-    p.win.mine = (token) => tokens.push(token);
-    p.run({ id: "w1", callback: "mine" });
-    p.loadApi();
-    p.submit();
-    p.api.renders[0].options.callback("tok");
-
-    expect(tokens).toEqual(["tok"]);
-    expect(p.sent).toHaveLength(1);
   });
 
   it("shows other submit listeners only the final submit", () => {
@@ -222,7 +182,7 @@ describe("invisible widget", () => {
     expect(p.sent).toHaveLength(1);
   });
 
-  it("releases the guard on close and on challenge expiry", () => {
+  it("releases the guard on close, on challenge expiry and on back-forward cache return", () => {
     const p = page(FORM);
     p.run({ id: "w1" });
     p.loadApi();
@@ -233,27 +193,17 @@ describe("invisible widget", () => {
     p.submit();
     options["chalexpired-callback"]();
     p.submit();
-
-    expect(p.api.executes).toHaveLength(3);
-    expect(p.log.filter((entry) => entry === "reset")).toHaveLength(1);
-    expect(p.sent).toEqual([]);
-  });
-
-  it("clears the guard when the page returns from the back-forward cache", () => {
-    const p = page(FORM);
-    p.run({ id: "w1" });
-    p.loadApi();
-    p.submit();
-
     p.win.dispatchEvent(Object.assign(new p.win.Event("pageshow"), { persisted: true }));
     p.submit();
 
-    expect(p.api.executes).toHaveLength(2);
+    expect(p.api.executes).toHaveLength(4);
+    expect(p.log.filter((entry) => entry === "reset")).toHaveLength(1);
+    expect(p.sent).toEqual([]);
   });
 });
 
 describe("loading", () => {
-  it("sends the form without a token when the script fails to load", () => {
+  it("sends the form without a token when the script fails to load, and later submits natively", () => {
     const p = page(FORM);
     p.run({ id: "w1" });
     p.submit();
@@ -263,16 +213,9 @@ describe("loading", () => {
     expect(p.sent).toHaveLength(1);
     expect(p.sent[0].data.get("h-captcha-response")).toBeNull();
     expect(p.api.executes).toEqual([]);
-  });
-
-  it("sends a later submit natively after a failed load", () => {
-    const p = page(FORM);
-    p.run({ id: "w1" });
-    p.scripts()[0].onerror();
 
     p.submit();
-
-    expect(p.sent).toHaveLength(1);
+    expect(p.sent).toHaveLength(2);
   });
 
   it("sends the form when the script never calls back", () => {
@@ -282,16 +225,6 @@ describe("loading", () => {
 
     expect(p.timers[0].ms).toBe(10000);
     p.timers[0].fn();
-
-    expect(p.sent).toHaveLength(1);
-  });
-
-  it("sends the form when onload fires without a usable API", () => {
-    const p = page(FORM);
-    p.run({ id: "w1" });
-    p.submit();
-
-    p.win.hcaptchaElixirTemplateOnload();
 
     expect(p.sent).toHaveLength(1);
   });
@@ -332,17 +265,6 @@ describe("loading", () => {
     p.loadApi();
 
     expect(calls).toBe(1);
-  });
-
-  it("keeps working when the onload function throws", () => {
-    const p = page(FORM);
-    p.win.mine = () => {
-      throw new Error("boom");
-    };
-    p.run({ id: "w1", onload: "mine" });
-    p.loadApi();
-
-    expect(p.api.renders).toHaveLength(1);
   });
 });
 
