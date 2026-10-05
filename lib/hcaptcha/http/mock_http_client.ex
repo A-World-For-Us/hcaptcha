@@ -7,12 +7,8 @@ defmodule Hcaptcha.Http.MockClient do
     * `Hcaptcha.TestKeys.token/0` and `"valid_response"`: success
     * any other token, `"invalid_response"` included: `invalid-input-response`
 
-  Any other secret returns `{:error, [:mock_requires_test_secret]}`. This check
-  protects production. An app may install the mock in every environment, for
-  example when its sitekey is missing. A real secret never validates a token
-  through the mock, so a mock left in production rejects every user instead of
-  letting them through. `"valid_response"` is not an hCaptcha test token: the
-  real API rejects it, and the mock accepts it only with the test secret.
+  Any other secret returns `{:error, [:mock_requires_test_secret]}`, so a mock left in
+  production with a real secret lets nobody through.
 
       config :hcaptcha,
         http_client: Hcaptcha.Http.MockClient,

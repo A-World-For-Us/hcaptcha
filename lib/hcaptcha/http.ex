@@ -2,19 +2,11 @@ defmodule Hcaptcha.Http do
   @moduledoc """
   Sends verification requests to the hCaptcha API with `Req`.
 
-  Application config:
+  Config keys: `:verify_url`, `:timeout` (5000 ms) and `:req_options`, extra options for
+  `Req.new/1` such as a proxy or `plug: {Req.Test, Hcaptcha.Http}` in tests.
 
-    * `:verify_url` - defaults to `https://api.hcaptcha.com/siteverify`
-    * `:timeout` - default for the `:timeout` option (5000)
-    * `:req_options` - transport options for `Req.new/1`, for example a proxy
-      (`connect_options: [proxy: ...]`), a connection pool (`finch`), an
-      `adapter`, or `plug: {Req.Test, Hcaptcha.Http}` to stub the API in tests
-
-  The library sets `method`, `url`, `body`, `headers`, `retry`, `redirect`,
-  `decode_body`, `into` and `receive_timeout` itself. `:req_options` cannot
-  change them. A `connect_options` list is kept, and its `:timeout` is
-  replaced. The request is never retried and redirects are not followed, so
-  the secret goes only to the configured URL.
+  `:req_options` cannot change the request itself, its retries or its redirects, so the secret
+  goes only to the configured URL.
   """
 
   @behaviour Hcaptcha.HttpClient
@@ -25,18 +17,10 @@ defmodule Hcaptcha.Http do
   @doc """
   Posts the form-encoded `body` to the verify URL.
 
-  Returns the decoded JSON object, or `{:error, atoms}`:
+  Returns the decoded JSON object, or `{:error, atoms}`: the transport reason (`:timeout`, ...),
+  `:http_error`, `:invalid_response_body` or `:unexpected_status`.
 
-    * the transport reason (`:timeout`, `:econnrefused`, ...) when the connection fails
-    * `:http_error` for any other client failure
-    * `:invalid_response_body` when a 200 answer is not a JSON object
-    * `:unexpected_status` when the status is not 200 (a redirect included) and the
-      body has no `error-codes`
-
-  ## Options
-
-    * `:timeout` - in ms. Sets the connect timeout and the receive timeout. The receive timeout
-      limits each wait for data, so the whole request can take longer than this value.
+  The `:timeout` option, in ms, is both the connect and the receive timeout.
   """
   @impl Hcaptcha.HttpClient
   def request_verification(body, options \\ []) do

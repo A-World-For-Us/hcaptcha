@@ -2,37 +2,14 @@ defmodule Hcaptcha do
   @moduledoc """
   Verifies hCaptcha response tokens on the server.
 
-  See the [hCaptcha documentation](https://docs.hcaptcha.com/) and the README.
-
-  ## Configuration
-
-  Set these in `config/runtime.exs`:
-
-    * `:secret` - the account secret
-    * `:public_key` - the sitekey, read by `Hcaptcha.Template`
-    * `:http_client` - a `Hcaptcha.HttpClient` (default `Hcaptcha.Http`)
-
-  `Hcaptcha.Http` lists the transport keys: `:verify_url`, `:timeout` and `:req_options`.
+  Config keys: `:secret`, `:public_key` and `:http_client` (default `Hcaptcha.Http`).
 
   ## Error atoms
 
-  `verify/2` returns `{:error, atoms}`. The atoms come from the API error
-  codes (`"missing-input-secret"` becomes `:missing_input_secret`), plus:
-
-    * `:missing_input_response` - no token was given, and no request was made.
-      The widget script was probably blocked or did not run.
-    * `:invalid_input_response` - the API rejected the token
-    * `:expired_input_response` - the token expired (120 s by default)
-    * `:already_seen_response` - the token was already verified once
-    * `:sitekey_secret_mismatch` - the sitekey does not belong to the secret
-    * `:missing_input_secret` - no secret is configured, and no request was made.
-      The API can also return it when a request has no secret.
-    * `:challenge_failed` - the API answered `success: false` with no error code
-    * `:unknown_error` - the API sent an error code this library does not know
-    * `:unexpected_response` - the API answer has no known shape
-    * `:invalid_response_body`, `:unexpected_status`, `:http_error`, or a
-      transport reason such as `:timeout` - see `Hcaptcha.Http`
-    * `:mock_requires_test_secret` - from `Hcaptcha.Http.MockClient`
+  API error codes become atoms: `"invalid-input-response"` is `:invalid_input_response`. The
+  library adds `:missing_input_response` (no token, so the widget script did not run),
+  `:challenge_failed`, `:unknown_error`, `:unexpected_response`, the `Hcaptcha.Http` errors and
+  `:mock_requires_test_secret`.
   """
 
   alias Hcaptcha.Http
@@ -64,23 +41,15 @@ defmodule Hcaptcha do
   @doc """
   Verifies the `h-captcha-response` token of a submitted form.
 
-  A `nil`, empty or non-binary token returns `{:error, [:missing_input_response]}`
-  without a request. A missing, empty or non-binary secret returns
-  `{:error, [:missing_input_secret]}` without a request, with any client. The module doc lists
-  every error atom.
+  An empty token or secret returns `:missing_input_response` or `:missing_input_secret` without
+  a request. A bad option value raises `ArgumentError`.
 
   ## Options
 
-    * `:timeout` - connect and receive timeout in ms, see `Hcaptcha.Http`
-      (default: config `:timeout`, then 5000)
-    * `:secret` - takes precedence over the configured secret, with every client
+    * `:timeout` - in ms, see `Hcaptcha.Http`
+    * `:secret` - overrides the configured secret
     * `:remote_ip` - the user's IP, as a string or an `:inet` tuple
     * `:sitekey` - the sitekey the token must have been issued for
-
-  A bad option value is a programming error and raises `ArgumentError`: a
-  `:remote_ip` that is not a string or a valid `:inet` address, a `:sitekey`
-  that is not a string, or a `:timeout` that is not a non-negative integer or
-  `:infinity`.
 
   ## Example
 

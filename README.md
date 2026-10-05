@@ -131,7 +131,7 @@ case Hcaptcha.verify(token) do
 end
 ```
 
-The moduledoc of `Hcaptcha` ([`lib/hcaptcha.ex`](lib/hcaptcha.ex)) lists every atom.
+hCaptcha error codes become atoms: `"invalid-input-response"` is `:invalid_input_response`. See the [hCaptcha error codes](https://docs.hcaptcha.com/#siteverify-error-codes-table) and the moduledoc of `Hcaptcha` ([`lib/hcaptcha.ex`](lib/hcaptcha.ex)) for the atoms the library adds.
 
 ## Testing
 
