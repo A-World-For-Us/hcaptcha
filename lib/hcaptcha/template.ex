@@ -1,15 +1,9 @@
 defmodule Hcaptcha.Template do
   @moduledoc """
-  Renders the HTML that shows an hCaptcha widget.
+  Renders an hCaptcha widget for forms rendered by controllers, not LiveView `phx-submit` forms.
 
-  `display/1` returns a string. In Phoenix templates, wrap it with `raw/1`.
-
-  The output holds a container `<div>` and an inline `<script>`. The script loads the hCaptcha
-  API once per page, then renders the widget in the container. Several calls on one page work:
-  they share one API script. The `:hl` option of the first call on a page sets the language.
-
-  The template is for forms rendered by controllers. LiveView `phx-submit` forms are not
-  supported. Do not load `api.js` yourself on a page that uses `display/1`.
+  The API script loads once per page, so several widgets can share a page. Do not load `api.js`
+  yourself on such a page.
   """
 
   @script_path Path.join(__DIR__, "template.js")
@@ -20,28 +14,20 @@ defmodule Hcaptcha.Template do
   @data_options [:theme, :type, :tabindex, :size, :badge]
 
   @doc """
-  Returns the HTML of an hCaptcha widget.
+  Returns the widget HTML as a string. In Phoenix templates, wrap it with `raw/1`.
 
   ## Options
 
-    * `:public_key` - the site key. Defaults to `:public_key` from the `:hcaptcha` config.
-    * `:theme`, `:type`, `:tabindex`, `:size`, `:badge` - written as `data-*` attributes and
-      passed to hCaptcha. Options that are `nil` are left out.
-    * `:hl` - language of the widget. Only the first call on a page has an effect.
-    * `:onload` - name of a global JavaScript function, called once without arguments when the
-      hCaptcha API is ready, before the first widget that names it renders.
-    * `:callback` - name of a global JavaScript function, called with the token when the
-      challenge succeeds. In `"invisible"` mode the form is submitted after it returns.
-    * `:class` - CSS class of the container. The container has no class by default.
-    * `:nonce` - CSP nonce, set on the inline script and on the script that loads the API.
+    * `:public_key` - the sitekey (default `Hcaptcha.public_key/0`)
+    * `:theme`, `:type`, `:tabindex`, `:size`, `:badge` - hCaptcha widget settings
+    * `:hl` - widget language. The first call on a page sets it.
+    * `:onload` - global JavaScript function called once when the API is ready
+    * `:callback` - global JavaScript function called with the token
+    * `:class` - CSS class of the container
+    * `:nonce` - CSP nonce for the inline script and the API script
 
-  ## Invisible mode
-
-  With `size: "invisible"` the widget runs when the form that contains it is submitted. The
-  submit event of other forms is untouched. The challenge runs once per submit, then the form
-  is sent again with the token and the clicked button. If the hCaptcha script fails to load,
-  is not ready within 10 seconds, or fails to render the widget, the form is sent without a
-  token.
+  With `size: "invisible"`, submitting the form runs the challenge, then sends the form with the
+  token. If the script does not load within 10 seconds, the form is sent without a token.
   """
   @spec display(keyword()) :: String.t()
   def display(options \\ []) do

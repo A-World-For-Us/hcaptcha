@@ -32,7 +32,17 @@ Transport options, such as a proxy, a connection pool or a test plug, go in the 
 
 `{:system, "VAR"}` values are no longer read: set the keys in `config/runtime.exs`. `Hcaptcha.Config` is removed. Read the sitekey with the new `Hcaptcha.public_key/0`.
 
+### Template
+
+In invisible mode, `Hcaptcha.Template.display/1` now listens only to the form that contains the widget. Before, it intercepted every form on the page, so a second form, or a multi-step LiveView form, was sent twice. It runs one challenge per submit, keeps the clicked button, and other `submit` listeners see only the final submit. A submit before the hCaptcha script has loaded waits for it. If the script fails to load or is not ready within 10 seconds, the form is sent without a token, so the server sees `:missing_input_response`. Before, the form was never sent.
+
+The new `:nonce` option sets the CSP nonce on the inline script and on the script it adds. Every option is escaped in the HTML and in the script, and the container has an `id` and no `h-captcha` class. The new `:class` option sets its CSS class. The API script loads once per page with explicit render, and several widgets can share a page. `:onload` names a global function called once when the API is ready.
+
 ### Migration
+
+#### Template
+
+A `:callback` must not submit the form any more: the template submits it after the callback, so the form would be sent twice. Remove any `<script src=".../api.js">` tag of your own from pages that use `display/1`, or hCaptcha renders the widget twice. CSS or JavaScript that selects `.h-captcha` must use a class set with `:class`. The global functions `hcaptchaCallback` and `onSubmit` are gone.
 
 #### Mock secret
 

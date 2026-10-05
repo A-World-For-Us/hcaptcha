@@ -45,7 +45,7 @@ All keys are read at runtime. `{:system, "VAR"}` tuples are not supported.
 
 ### Render the widget
 
-Use `raw` (from Phoenix.HTML) and `Hcaptcha.Template.display/1`. It returns a string with a container `<div>` and an inline `<script>`.
+`Hcaptcha.Template.display/1` returns the widget HTML for a form rendered by a controller. Wrap it with `raw`.
 
 Checkbox:
 
@@ -55,7 +55,7 @@ Checkbox:
 </form>
 ```
 
-Invisible. The challenge runs when the form that contains the widget is submitted. Other forms on the page are not touched:
+Invisible. The challenge runs when this form is submitted, and other forms on the page are not touched:
 
 ```html
 <form method="post" action="/somewhere">
@@ -63,25 +63,17 @@ Invisible. The challenge runs when the form that contains the widget is submitte
 </form>
 ```
 
-Several widgets can share one page, for example two invisible forms, or one invisible and one checkbox. The page loads the hCaptcha script once. The `hl` option of the first widget sets the language.
+Several widgets can share a page. If the hCaptcha script does not load within 10 seconds, an invisible form is sent without a token, and `Hcaptcha.verify/2` returns `:missing_input_response`. Do not load `api.js` yourself on these pages.
 
-If the hCaptcha script fails to load, is not ready within 10 seconds, or cannot render the widget, an invisible form is sent without a token. `Hcaptcha.verify/2` then returns an error for the missing token. A submit made before the script has loaded waits for it. After the challenge, the form is sent again with the token and the clicked button.
-
-The template is for forms rendered by controllers. LiveView `phx-submit` forms are not supported: use the LiveView component and hook instead. Do not load `api.js` yourself on a page that uses `display/1`.
-
-`display/1` options:
-
-| Option       | Action                                         | Default                  |
-| :----------- | :--------------------------------------------- | :----------------------- |
-| `public_key` | Sets the `data-sitekey` attribute              | `:public_key` from config |
-| `hl`         | Language of the widget                         | none, hCaptcha detects the language |
-| `onload`     | Name of a global JavaScript function, called once without arguments when the hCaptcha script is ready, however many widgets use it | none |
-| `callback`   | Name of a global JavaScript function, called with the token on success. In invisible mode the form is submitted after it returns | none |
-| `class`      | CSS class of the container `<div>`, which has none by default | none |
-| `nonce`      | CSP nonce, set on the inline script and on the script it adds | none |
-| `theme`, `type`, `tabindex`, `size`, `badge` | Set the matching `data-*` attributes | none |
-
-Options that are `nil` are left out. All values are HTML-escaped.
+| Option       | Use                                                     | Default                   |
+| :----------- | :------------------------------------------------------ | :------------------------ |
+| `public_key` | Sitekey                                                 | `:public_key` from config |
+| `hl`         | Widget language, set by the first widget on the page    | detected by hCaptcha      |
+| `onload`     | Global JavaScript function called when the API is ready | none                      |
+| `callback`   | Global JavaScript function called with the token        | none                      |
+| `class`      | CSS class of the container                              | none                      |
+| `nonce`      | CSP nonce for the scripts                               | none                      |
+| `theme`, `type`, `tabindex`, `size`, `badge` | hCaptcha widget settings | none                |
 
 ### Content Security Policy
 
@@ -94,7 +86,7 @@ style-src   https://hcaptcha.com https://*.hcaptcha.com
 connect-src https://hcaptcha.com https://*.hcaptcha.com
 ```
 
-If your policy uses nonces, pass the nonce to `display/1`. With `'strict-dynamic'` the inline script is allowed by its nonce, and the hCaptcha script it adds inherits that trust.
+With a nonce policy, pass the nonce to `display/1`:
 
 ```elixir
 # router.ex
