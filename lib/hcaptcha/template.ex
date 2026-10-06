@@ -28,7 +28,8 @@ defmodule Hcaptcha.Template do
     * `:nonce` - CSP nonce for the inline script and the API script
 
   With `size: "invisible"`, submitting the form runs the challenge, then sends the form with the
-  token. If the script does not load within 10 seconds, the form is sent without a token.
+  token. If the script does not load, or the challenge neither answers nor opens within 10
+  seconds, the form is sent without a token.
   """
   @spec display(keyword()) :: String.t()
   def display(options \\ []) do

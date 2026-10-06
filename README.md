@@ -63,7 +63,7 @@ Invisible. The challenge runs when this form is submitted, and other forms on th
 </form>
 ```
 
-Several widgets can share a page. If the hCaptcha script does not load within 10 seconds, an invisible form is sent without a token, and `Hcaptcha.verify/2` returns `:missing_input_response`. Do not load `api.js` yourself on these pages.
+Several widgets can share a page. If the hCaptcha script does not load, or the challenge neither answers nor opens within 10 seconds, an invisible form is sent without a token, and `Hcaptcha.verify/2` returns `:missing_input_response`. Do not load `api.js` yourself on these pages.
 
 | Option       | Use                                                     | Default                   |
 | :----------- | :------------------------------------------------------ | :------------------------ |

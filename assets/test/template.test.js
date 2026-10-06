@@ -13,7 +13,7 @@ function page(body) {
   });
   const win = dom.window;
   const timers = [];
-  win.setTimeout = (fn, ms) => timers.push({ fn, ms, live: true });
+  win.setTimeout = (fn, ms) => (ms ? timers.push({ fn, ms, live: true }) : setTimeout(fn));
   win.clearTimeout = (id) => {
     if (timers[id - 1]) timers[id - 1].live = false;
   };
@@ -81,7 +81,11 @@ function page(body) {
     }
     hook();
   };
-  const settle = () => new Promise((done) => setTimeout(done));
+  const tick = () => new Promise((done) => setTimeout(done));
+  const settle = async () => {
+    await tick();
+    await tick();
+  };
   const loadApi = async () => {
     win.hcaptcha = api;
     win.hcaptchaElixirTemplateOnload();
@@ -196,7 +200,9 @@ describe("invisible widget", () => {
     p.win.HTMLFormElement.prototype.requestSubmit = undefined;
     p.run({ id: "w1" });
     await p.loadApi();
-    p.win.document.getElementById("f").dispatchEvent(new p.win.Event("submit", { cancelable: true }));
+    p.win.document
+      .getElementById("f")
+      .dispatchEvent(new p.win.Event("submit", { cancelable: true }));
     await p.settle();
     p.api.renders[0].options.callback("tok");
 
@@ -256,6 +262,43 @@ describe("loading", () => {
 
     await p.submit();
     expect(p.sent).toHaveLength(2);
+  });
+
+  it("sends the form after the event has finished dispatching when the script already failed", async () => {
+    const p = page(FORM);
+    p.run({ id: "w1" });
+    await p.fail(() => p.scripts()[0].onerror());
+
+    p.win.document.querySelector("form").requestSubmit();
+    for (let turn = 0; turn < 5; turn++) await Promise.resolve();
+    expect(p.sent).toEqual([]);
+
+    await p.settle();
+    expect(p.sent).toHaveLength(1);
+  });
+
+  it("sends the form without a token when the challenge neither answers nor opens in 10 seconds", async () => {
+    const p = page(FORM);
+    p.run({ id: "w1" });
+    await p.loadApi();
+    await p.submit();
+
+    expect(p.timers.at(-1).ms).toBe(10000);
+    await p.fail(() => p.timers.at(-1).fn());
+
+    expect(p.sent).toHaveLength(1);
+    expect(p.sent[0].data.get("h-captcha-response")).toBeNull();
+  });
+
+  it("keeps waiting when the challenge window is open", async () => {
+    const p = page(FORM);
+    p.run({ id: "w1" });
+    await p.loadApi();
+    await p.submit();
+    p.api.renders[0].options["open-callback"]();
+    await p.fail(() => p.timers.at(-1).fn());
+
+    expect(p.sent).toEqual([]);
   });
 
   it("sends the form when the script never calls back", async () => {
