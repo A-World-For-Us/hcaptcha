@@ -89,7 +89,6 @@ defmodule Hcaptcha.Template do
   end
 
   defp js(nil), do: "null"
-  defp js(false), do: "null"
 
   defp js(value) do
     escaped =

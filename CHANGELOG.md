@@ -42,7 +42,7 @@ The new `:nonce` option sets the CSP nonce on the inline script and on the scrip
 
 #### Template
 
-A `:callback` must not submit the form any more: the template submits it after the callback, so the form would be sent twice. Remove any `<script src=".../api.js">` tag of your own from pages that use `display/1`, or hCaptcha renders the widget twice. CSS or JavaScript that selects `.h-captcha` must use a class set with `:class`. The global functions `hcaptchaCallback` and `onSubmit` are gone.
+A `:callback` must not submit the form any more: the template submits it after the callback, so the form would be sent twice. Remove any `<script src=".../api.js">` tag of your own from pages that use `display/1`, or hCaptcha renders the widget twice. CSS or JavaScript that selects `.h-captcha` must use a class set with `:class`. The container has no `data-callback` attribute any more: the callback name goes through the script. The global functions `hcaptchaCallback` and `onSubmit` are gone.
 
 #### Mock secret
 

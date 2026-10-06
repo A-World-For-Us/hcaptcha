@@ -59,7 +59,8 @@ function page(body) {
       api.renders.push({ el, options });
       return api.renders.length;
     },
-    execute(id) {
+    execute(id, options) {
+      if (!options?.async) throw new Error("execute needs { async: true }");
       log.push("execute");
       api.executes.push(id);
       return new Promise((resolve, reject) => api.calls.push({ resolve, reject }));
@@ -254,6 +255,25 @@ describe("invisible widget", () => {
     expect(p.api.executes).toHaveLength(4);
     expect(p.log.filter((entry) => entry === "reset")).toHaveLength(2);
     expect(p.sent).toEqual([]);
+  });
+
+  it("ignores a challenge that answers after a back-forward cache return", async () => {
+    const p = page(FORM);
+    p.run({ id: "w1" });
+    await p.loadApi();
+
+    await p.submit();
+    const stale = p.api.calls.at(-1);
+    p.win.dispatchEvent(Object.assign(new p.win.Event("pageshow"), { persisted: true }));
+    await p.submit();
+    stale.resolve({ response: "old", key: "k" });
+    await p.settle();
+    expect(p.sent).toEqual([]);
+
+    await p.answer("new");
+    expect(p.sent).toHaveLength(1);
+    expect(p.sent[0].data.get("h-captcha-response")).toBe("new");
+    expect(p.timers.filter((timer) => timer.live)).toEqual([]);
   });
 });
 
