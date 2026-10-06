@@ -45,21 +45,21 @@ All keys are read at runtime. `{:system, "VAR"}` tuples are not supported.
 
 ### Render the widget
 
-`Hcaptcha.Template.display/1` returns the widget HTML for a form rendered by a controller. Wrap it with `raw`.
+`Hcaptcha.Template.display/1` returns the widget HTML for a form rendered by a controller. In a HEEx template, pass it to `raw/1`.
 
 Checkbox:
 
-```html
+```heex
 <form method="post" action="/somewhere">
-  <%= raw Hcaptcha.Template.display %>
+  {Hcaptcha.Template.display() |> raw()}
 </form>
 ```
 
 Invisible. The challenge runs when this form is submitted, and other forms on the page are not touched:
 
-```html
+```heex
 <form method="post" action="/somewhere">
-  <%= raw Hcaptcha.Template.display(size: "invisible") %>
+  {Hcaptcha.Template.display(size: "invisible") |> raw()}
 </form>
 ```
 
@@ -107,8 +107,8 @@ defp put_csp_nonce(conn, _opts) do
 end
 ```
 
-```html
-<%= raw Hcaptcha.Template.display(size: "invisible", nonce: @csp_nonce) %>
+```heex
+{Hcaptcha.Template.display(size: "invisible", nonce: @csp_nonce) |> raw()}
 ```
 
 ### Verify the response

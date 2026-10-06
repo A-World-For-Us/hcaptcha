@@ -14,7 +14,8 @@ defmodule Hcaptcha.Template do
   @data_options [:theme, :type, :tabindex, :size, :badge]
 
   @doc """
-  Returns the widget HTML as a string. In Phoenix templates, wrap it with `raw/1`.
+  Returns the widget HTML as a string. In a HEEx template, write
+  `{Hcaptcha.Template.display(size: "invisible") |> raw()}`.
 
   ## Options
 
