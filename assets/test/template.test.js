@@ -68,16 +68,16 @@ function page(body) {
   };
 
   const run = (...configs) => {
-    for (const config of configs) {
-      const cfg = {
+    for (const overrides of configs) {
+      const config = {
         invisible: true,
         src: SRC,
         nonce: null,
         callback: null,
         onload: null,
-        ...config,
+        ...overrides,
       };
-      win.eval(SOURCE.replace("__CONFIG__", JSON.stringify(cfg)));
+      win.eval(SOURCE.replace("__CONFIG__", JSON.stringify(config)));
     }
     hook();
   };
