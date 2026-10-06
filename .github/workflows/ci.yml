@@ -8,6 +8,8 @@ on:
     branches:
       - master
   pull_request:
+  schedule:
+    - cron: "17 3 * * *"
 
 permissions:
   contents: read
@@ -22,6 +24,7 @@ env:
 jobs:
   elixir:
     name: ${{ matrix.name }}
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-24.04
 
     strategy:
@@ -122,6 +125,7 @@ jobs:
 
   docs:
     name: Documentation
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-24.04
     env:
       MIX_ENV: dev
@@ -146,6 +150,7 @@ jobs:
 
   js:
     name: JavaScript
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-24.04
 
     steps:
@@ -166,8 +171,61 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Check formatting
+        run: npm run format:check
+
+  e2e:
+    name: Browser tests
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Elixir
+        id: elixir-install
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        with:
+          elixir-version: "1.20.4"
+          otp-version: "29.0.6"
+          version-type: strict
+
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .tool-versions
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+
+      - name: Restore Mix.install cache
+        id: mix-install-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/mix/installs
+          key: e2e-${{ runner.os }}-${{ steps.elixir-install.outputs.elixir-version }}-${{ steps.elixir-install.outputs.otp-version }}-${{ hashFiles('e2e/server.exs', 'mix.exs') }}
+
+      - name: Install the tools
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run the browser tests
+        working-directory: e2e
+        run: npx playwright test
+
+      - name: Save Mix.install cache
+        if: github.event_name == 'push' && steps.mix-install-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/mix/installs
+          key: ${{ steps.mix-install-cache.outputs.cache-primary-key }}
+
   zizmor:
     name: Audit with zizmor
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
 
     steps:
