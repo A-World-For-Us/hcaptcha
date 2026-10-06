@@ -21,7 +21,8 @@ defmodule Hcaptcha.Template do
     * `:public_key` - the sitekey (default `Hcaptcha.public_key/0`)
     * `:theme`, `:type`, `:tabindex`, `:size`, `:badge` - hCaptcha widget settings
     * `:hl` - widget language. The first call on a page sets it.
-    * `:onload` - global JavaScript function called once when the API is ready
+    * `:onload` - global JavaScript function called when the API is ready. The first call on a
+      page sets it.
     * `:callback` - global JavaScript function called with the token
     * `:class` - CSS class of the container
     * `:nonce` - CSP nonce for the inline script and the API script

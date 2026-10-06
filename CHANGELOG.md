@@ -36,7 +36,7 @@ Transport options, such as a proxy, a connection pool or a test plug, go in the 
 
 In invisible mode, `Hcaptcha.Template.display/1` now listens only to the form that contains the widget. Before, it intercepted every form on the page, so a second form, or a multi-step LiveView form, was sent twice. It runs one challenge per submit, keeps the clicked button, and other `submit` listeners see only the final submit. A submit before the hCaptcha script has loaded waits for it. If the script fails to load or is not ready within 10 seconds, the form is sent without a token, so the server sees `:missing_input_response`. Before, the form was never sent.
 
-The new `:nonce` option sets the CSP nonce on the inline script and on the script it adds. Every option is escaped in the HTML and in the script, and the container has an `id` and no `h-captcha` class. The new `:class` option sets its CSS class. The API script loads once per page with explicit render, and several widgets can share a page. `:onload` names a global function called once when the API is ready.
+The new `:nonce` option sets the CSP nonce on the inline script and on the script it adds. Every option is escaped in the HTML and in the script, and the container has an `id` and no `h-captcha` class. The new `:class` option sets its CSS class. The API script loads once per page with explicit render, and several widgets can share a page. `:onload` names a global function called once when the API is ready. Like `:hl`, the first widget on the page sets it.
 
 ### Migration
 

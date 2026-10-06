@@ -69,7 +69,7 @@ Several widgets can share a page. If the hCaptcha script does not load within 10
 | :----------- | :------------------------------------------------------ | :------------------------ |
 | `public_key` | Sitekey                                                 | `:public_key` from config |
 | `hl`         | Widget language, set by the first widget on the page    | detected by hCaptcha      |
-| `onload`     | Global JavaScript function called when the API is ready | none                      |
+| `onload`     | Global JavaScript function called when the API is ready, set by the first widget on the page | none |
 | `callback`   | Global JavaScript function called with the token        | none                      |
 | `class`      | CSS class of the container                              | none                      |
 | `nonce`      | CSP nonce for the scripts                               | none                      |
