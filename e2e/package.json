@@ -1,0 +1,17 @@
+{
+  "name": "hcaptcha-e2e",
+  "private": true,
+  "description": "Browser tests for the hcaptcha template",
+  "scripts": {
+    "test": "playwright test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "prettier": {
+    "printWidth": 100
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.0",
+    "prettier": "^3.9.9"
+  }
+}
