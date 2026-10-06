@@ -26,13 +26,20 @@ config :hcaptcha,
   secret: System.fetch_env!("HCAPTCHA_PRIVATE_KEY")
 ```
 
-Other keys:
+All keys are read at runtime. `{:system, "VAR"}` tuples are not supported.
 
-```elixir
-config :hcaptcha, :json_library, Poison
-```
+| Key           | Use                                                        | Default                              |
+| :------------ | :--------------------------------------------------------- | :----------------------------------- |
+| `secret`      | Secret sent by `Hcaptcha.verify/2`                         | none (`verify` returns `{:error, [:missing_input_secret]}`) |
+| `public_key`  | Sitekey, read by `Hcaptcha.Template.display/1`             | none                                 |
+| `http_client` | Module that implements `Hcaptcha.HttpClient`               | `Hcaptcha.Http`                      |
+| `verify_url`  | Siteverify endpoint                                        | `https://api.hcaptcha.com/siteverify` |
+| `timeout`     | Default for the `timeout` option of `verify/2`, in ms      | `5000`                               |
+| `req_options` | Transport options passed to `Req.new/1` (proxy, pool, test `plug`) | `[]`                                 |
 
-`:json_library` defaults to `Jason`.
+`Hcaptcha.Http` decodes the answer with Jason. The `:json_library` option no longer exists.
+
+`req_options` can set transport options such as `connect_options` (proxy), `finch` (pool), `adapter` and `plug`. The library owns `method`, `url`, `body`, `headers`, `retry`, `redirect`, `decode_body`, `into` and `receive_timeout`; your values for those are ignored. Requests are never retried and redirects are not followed.
 
 ## Usage
 
@@ -76,44 +83,85 @@ The hCaptcha script loads asynchronously. To run code once it has loaded, pass t
 
 ```elixir
 def create(conn, params) do
-  case Hcaptcha.verify(params["h-captcha-response"]) do
-    {:ok, response} -> do_something(response)
-    {:error, errors} -> handle_error(errors)
+  remote_ip = conn.remote_ip |> :inet.ntoa() |> to_string()
+
+  case Hcaptcha.verify(params["h-captcha-response"], remote_ip: remote_ip) do
+    {:ok, %Hcaptcha.Response{}} ->
+      create_account(conn, params)
+
+    {:error, [:missing_input_response]} ->
+      # No token: the script was blocked or did not run.
+      render_error(conn, "Enable JavaScript and reload the page.")
+
+    {:error, _errors} ->
+      render_error(conn, "The captcha check failed. Try again.")
   end
 end
 ```
 
 `Hcaptcha.verify/2` sends a `POST` request to the hCaptcha API and returns:
 
-- `{:ok, %Hcaptcha.Response{challenge_ts: timestamp, hostname: host}}` when the response is valid. See the [API documentation](https://docs.hcaptcha.com/#verify-the-user-response-server-side).
-- `{:error, errors}` with a list of atoms. They come from the API [error codes](https://docs.hcaptcha.com/#siteverify-error-codes-table), or are `:challenge_failed` when the request succeeds but the challenge fails.
+- `{:ok, %Hcaptcha.Response{challenge_ts: timestamp, hostname: host}}` when the token is valid.
+- `{:error, errors}` with a list of atoms.
+
+A `nil`, empty or non-string token returns `{:error, [:missing_input_response]}` and sends no request. A missing or non-string secret returns `{:error, [:missing_input_secret]}` and sends no request, with every client. A token that the API refuses returns `{:error, [:invalid_input_response]}`, `[:expired_input_response]`, `[:already_seen_response]` or `[:sitekey_secret_mismatch]`. This lets you tell a missing token from a bad one.
+
+A bad option value (`remote_ip: {1, 2}`, a `sitekey` that is not a string, a negative `timeout`) is a programming error and raises `ArgumentError`.
 
 Options:
 
-| Option      | Action                                | Default                  |
-| :---------- | :------------------------------------ | :----------------------- |
-| `timeout`   | Time to wait for the API, in ms       | `5000`                   |
-| `secret`    | Secret sent with the request          | `:secret` from config    |
-| `remote_ip` | The user's IP address                 | none                     |
+| Option      | Action                                                                  | Default                |
+| :---------- | :---------------------------------------------------------------------- | :--------------------- |
+| `timeout`   | Connect timeout and receive timeout, in ms (see below)                  | `:timeout` from config, else `5000` |
+| `secret`    | Secret sent with the request. Takes precedence over the config, with the mock too | `:secret` from config  |
+| `remote_ip` | The user's IP address, as a string or an `:inet` tuple. Sent as `remoteip` | none                |
+| `sitekey`   | The sitekey the token must belong to                                    | none                   |
+
+`timeout` applies to the connection and to each wait for data from the API, so a request can take longer than this value in total. A failed request is not retried.
+
+### Errors
+
+`verify/2` returns `{:error, atoms}`. The list can hold several atoms when the API returns several codes. Match `:missing_input_response` first to tell a missing token (the widget script was blocked) from a bad one:
+
+```elixir
+case Hcaptcha.verify(token) do
+  {:ok, _response} -> :ok
+  {:error, [:missing_input_response]} -> :no_token
+  {:error, errors} -> {:rejected, errors}
+end
+```
+
+hCaptcha error codes become atoms: `"invalid-input-response"` is `:invalid_input_response`. See the [hCaptcha error codes](https://docs.hcaptcha.com/#siteverify-error-codes-table) and the moduledoc of `Hcaptcha` ([`lib/hcaptcha.ex`](lib/hcaptcha.ex)) for the atoms the library adds.
 
 ## Testing
 
-hCaptcha publishes [test keys](https://docs.hcaptcha.com/#integration-testing-test-keys). With the test secret `0x0000000000000000000000000000000000000000`, the API accepts the token `10000000-aaaa-bbbb-cccc-000000000001`. This needs network access.
+hCaptcha publishes [test keys](https://docs.hcaptcha.com/#integration-testing-test-keys). `Hcaptcha.TestKeys` has them: `sitekey/0`, `secret/0` and `token/0`. The real API accepts the test token with the test secret.
 
-To test without network access, use the mock client:
+To run tests without network access, configure the mock client in `config/test.exs`:
 
 ```elixir
 config :hcaptcha,
   http_client: Hcaptcha.Http.MockClient,
-  secret: "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe"
+  secret: "0x0000000000000000000000000000000000000000",
+  public_key: "10000000-ffff-ffff-ffff-000000000001"
 ```
 
 ```elixir
-{:ok, _response} = Hcaptcha.verify("valid_response")
-{:error, _errors} = Hcaptcha.verify("invalid_response")
+{:ok, _response} = Hcaptcha.verify(Hcaptcha.TestKeys.token())
+{:error, [:invalid_input_response]} = Hcaptcha.verify("anything else")
 ```
 
-The mock client sends any other token to the real API.
+The mock never calls the network. With the test secret it accepts the test token and `valid_response`. Every other token, `invalid_response` included, returns `:invalid_input_response`. With any other secret it returns `{:error, [:mock_requires_test_secret]}`, so a mock left in production rejects every user and lets nobody through. The mock records nothing and sends no message. To check the request body, stub the API with `Req.Test` (below).
+
+To stub the API itself, use `Req.Test`. It needs `{:plug, "~> 1.16", only: :test}` in your own dependencies:
+
+```elixir
+config :hcaptcha, req_options: [plug: {Req.Test, Hcaptcha.Http}]
+```
+
+```elixir
+Req.Test.stub(Hcaptcha.Http, &Req.Test.json(&1, %{"success" => true}))
+```
 
 ## Contributing
 
