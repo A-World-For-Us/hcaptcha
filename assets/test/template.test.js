@@ -52,6 +52,7 @@ function page(body) {
   const api = {
     renders: [],
     executes: [],
+    calls: [],
     throwOn: null,
     render(el, options) {
       if (api.throwOn === el.id) throw new Error("bad param");
@@ -61,6 +62,7 @@ function page(body) {
     execute(id) {
       log.push("execute");
       api.executes.push(id);
+      return new Promise((resolve, reject) => api.calls.push({ resolve, reject }));
     },
     reset(id) {
       log.push("reset");
@@ -91,6 +93,14 @@ function page(body) {
     win.hcaptchaElixirTemplateOnload();
     await settle();
   };
+  const answer = async (response) => {
+    api.calls.at(-1).resolve({ response, key: "k" });
+    await settle();
+  };
+  const dismiss = async (reason) => {
+    api.calls.at(-1).reject(reason);
+    await settle();
+  };
   const fail = async (fn) => {
     fn();
     await settle();
@@ -106,6 +116,8 @@ function page(body) {
     api,
     run,
     loadApi,
+    answer,
+    dismiss,
     fail,
     settle,
     scripts,
@@ -155,11 +167,9 @@ describe("invisible widget", () => {
     p.run({ id: "w1", callback: "mine" });
     await p.loadApi();
     await p.submit();
-    const { callback, "error-callback": error } = p.api.renders[0].options;
 
     expect(p.api.renders[0].options).toMatchObject({ sitekey: "k", size: "invisible" });
-    callback("tok");
-    error();
+    await p.answer("tok");
 
     expect(tokens).toEqual(["tok"]);
     expect(p.log).toEqual(["execute", "reset"]);
@@ -176,7 +186,7 @@ describe("invisible widget", () => {
     p.win.document.getElementById("w1").appendChild(field);
     await p.submit();
 
-    p.api.renders[0].options.callback("tok");
+    await p.answer("tok");
 
     expect(field.value).toBe("tok");
     expect(p.win.document.querySelectorAll('[name="h-captcha-response"]')).toHaveLength(1);
@@ -188,7 +198,7 @@ describe("invisible widget", () => {
     await p.loadApi();
     p.win.document.getElementById("go").click();
     await p.settle();
-    p.api.renders[0].options.callback("tok");
+    await p.answer("tok");
 
     expect(p.sent).toHaveLength(1);
     expect(p.sent[0].submitter.id).toBe("go");
@@ -204,7 +214,7 @@ describe("invisible widget", () => {
       .getElementById("f")
       .dispatchEvent(new p.win.Event("submit", { cancelable: true }));
     await p.settle();
-    p.api.renders[0].options.callback("tok");
+    await p.answer("tok");
 
     expect(p.sent).toHaveLength(1);
     expect(p.sent[0].native).toBe(true);
@@ -223,7 +233,7 @@ describe("invisible widget", () => {
     await p.submit();
     expect([onForm, onDocument]).toEqual([0, 0]);
 
-    p.api.renders[0].options.callback("tok");
+    await p.answer("tok");
     expect([onForm, onDocument]).toEqual([1, 1]);
     expect(p.sent).toHaveLength(1);
   });
@@ -232,18 +242,17 @@ describe("invisible widget", () => {
     const p = page(FORM);
     p.run({ id: "w1" });
     await p.loadApi();
-    const options = p.api.renders[0].options;
 
     await p.submit();
-    options["close-callback"]();
+    await p.dismiss("challenge-closed");
     await p.submit();
-    options["chalexpired-callback"]();
+    await p.dismiss(new Error("challenge-expired"));
     await p.submit();
     p.win.dispatchEvent(Object.assign(new p.win.Event("pageshow"), { persisted: true }));
     await p.submit();
 
     expect(p.api.executes).toHaveLength(4);
-    expect(p.log.filter((entry) => entry === "reset")).toHaveLength(1);
+    expect(p.log.filter((entry) => entry === "reset")).toHaveLength(2);
     expect(p.sent).toEqual([]);
   });
 });
@@ -296,8 +305,8 @@ describe("loading", () => {
     await p.loadApi();
     await p.submit();
     p.api.renders[0].options["open-callback"]();
-    await p.fail(() => p.timers.at(-1).fn());
 
+    expect(p.timers.at(-1).live).toBe(false);
     expect(p.sent).toEqual([]);
   });
 
@@ -352,15 +361,23 @@ describe("loading", () => {
 });
 
 describe("checkbox widget", () => {
-  it("renders explicitly with its data attributes and adds no submit listener", async () => {
+  it("renders explicitly with its data attributes, calls the callback and adds no submit listener", async () => {
     const p = page(
-      '<form id="f"><div id="w1" class="h-captcha" data-sitekey="k" data-theme="dark" data-callback="cb"></div></form>',
+      '<form id="f"><div id="w1" class="h-captcha" data-sitekey="k" data-theme="dark"></div></form>',
     );
-    p.run({ id: "w1", invisible: false });
+    const tokens = [];
+    p.win.cb = (token) => tokens.push(token);
+    p.run({ id: "w1", invisible: false, callback: "cb" });
     await p.loadApi();
     await p.submit();
+    p.api.renders[0].options.callback("tok");
 
-    expect(p.api.renders[0].options).toEqual({ sitekey: "k", theme: "dark", callback: "cb" });
+    expect(p.api.renders[0].options).toEqual({
+      sitekey: "k",
+      theme: "dark",
+      callback: expect.any(Function),
+    });
+    expect(tokens).toEqual(["tok"]);
     expect(p.events[0].prevented).toBe(false);
   });
 });

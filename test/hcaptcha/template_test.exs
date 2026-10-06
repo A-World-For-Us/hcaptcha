@@ -20,9 +20,12 @@ defmodule Hcaptcha.TemplateTest do
 
     assert html =~ ~s|<div class="my-captcha" id=|
 
-    for attribute <- ~w(sitekey theme type tabindex size callback badge) do
+    for attribute <- ~w(sitekey theme type tabindex size badge) do
       assert html =~ "data-#{attribute}="
     end
+
+    assert html =~ ~s(callback: "enableBtn")
+    refute html =~ "data-callback"
 
     bare = Template.display()
     assert bare =~ ~s(data-sitekey="#{Application.get_env(:hcaptcha, :public_key)}")
@@ -92,6 +95,9 @@ defmodule Hcaptcha.TemplateTest do
 
     html = Template.display(size: "invisible", onload: "myLoad", callback: "myCallback")
     assert html =~ ~s(onload: "myLoad")
+    assert html =~ ~s(callback: "myCallback")
+
+    html = Template.display(size: "compact", callback: "myCallback")
     assert html =~ ~s(callback: "myCallback")
     refute html =~ "data-callback"
   end

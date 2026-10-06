@@ -44,15 +44,14 @@ defmodule Hcaptcha.Template do
         id: id,
         "data-sitekey": options[:public_key] || Hcaptcha.public_key()
       ] ++
-        for(key <- @data_options, do: {:"data-#{key}", options[key]}) ++
-        if(invisible?, do: [], else: [{:"data-callback", options[:callback]}])
+        for(key <- @data_options, do: {:"data-#{key}", options[key]})
 
     container =
       ~s(<div#{attributes(attributes)}></div>)
 
     config =
       "{id: #{js(id)}, invisible: #{invisible?}, src: #{js(api_url(options))}, " <>
-        "nonce: #{js(nonce)}, callback: #{js(invisible? && options[:callback])}, " <>
+        "nonce: #{js(nonce)}, callback: #{js(options[:callback])}, " <>
         "onload: #{js(options[:onload])}}"
 
     script =
