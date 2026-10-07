@@ -45,39 +45,71 @@ All keys are read at runtime. `{:system, "VAR"}` tuples are not supported.
 
 ### Render the widget
 
-Use `raw` (from Phoenix.HTML) and `Hcaptcha.Template.display/1`.
+`Hcaptcha.Template.display/1` returns the widget HTML for a form rendered by a controller. In a HEEx template, pass it to `raw/1`.
 
 Checkbox:
 
-```html
+```heex
 <form method="post" action="/somewhere">
-  <%= raw Hcaptcha.Template.display %>
+  {Hcaptcha.Template.display() |> raw()}
 </form>
 ```
 
-Invisible:
+Invisible. The challenge runs when this form is submitted, and other forms on the page are not touched:
 
-```html
+```heex
 <form method="post" action="/somewhere">
-  <%= raw Hcaptcha.Template.display(size: "invisible") %>
+  {Hcaptcha.Template.display(size: "invisible") |> raw()}
 </form>
 ```
 
-The hCaptcha script loads asynchronously. To run code once it has loaded, pass the name of a JavaScript function:
+Several widgets can share a page. If the hCaptcha script does not load, or the challenge neither answers nor opens within 10 seconds, an invisible form is sent without a token, and `Hcaptcha.verify/2` returns `:missing_input_response`. Do not load `api.js` yourself on these pages.
 
-```html
-<%= raw Hcaptcha.Template.display(onload: "myOnLoadCallback") %>
+| Option       | Use                                                     | Default                   |
+| :----------- | :------------------------------------------------------ | :------------------------ |
+| `public_key` | Sitekey                                                 | `:public_key` from config |
+| `hl`         | Widget language, set by the first widget on the page    | detected by hCaptcha      |
+| `onload`     | Global JavaScript function called when the API is ready, set by the first widget on the page | none |
+| `callback`   | Global JavaScript function called with the token        | none                      |
+| `class`      | CSS class of the container                              | none                      |
+| `nonce`      | CSP nonce for the scripts                               | none                      |
+| `theme`, `type`, `tabindex`, `size`, `badge` | hCaptcha widget settings | none                |
+
+### Content Security Policy
+
+hCaptcha [needs these directives](https://docs.hcaptcha.com/#content-security-policy-settings):
+
+```text
+script-src  https://hcaptcha.com https://*.hcaptcha.com
+frame-src   https://hcaptcha.com https://*.hcaptcha.com
+style-src   https://hcaptcha.com https://*.hcaptcha.com
+connect-src https://hcaptcha.com https://*.hcaptcha.com
 ```
 
-`display/1` options:
+With a nonce policy, pass the nonce to `display/1`:
 
-| Option       | Action                                         | Default                  |
-| :----------- | :--------------------------------------------- | :----------------------- |
-| `public_key` | Sets the `data-sitekey` attribute              | `:public_key` from config |
-| `hl`         | Language of the widget                         | `en`                     |
-| `onload`     | Name of a JavaScript function called on load   | none                     |
-| `callback`   | Name of the JavaScript function called on success | `hcaptchaCallback` when `size` is `"invisible"` |
-| `theme`, `type`, `tabindex`, `size`, `badge` | Set the matching `data-*` attributes | none |
+```elixir
+# router.ex
+plug :put_csp_nonce
+
+defp put_csp_nonce(conn, _opts) do
+  nonce = 16 |> :crypto.strong_rand_bytes() |> Base.encode64(padding: false)
+
+  conn
+  |> assign(:csp_nonce, nonce)
+  |> put_resp_header(
+    "content-security-policy",
+    "script-src 'nonce-#{nonce}' 'strict-dynamic' https://hcaptcha.com https://*.hcaptcha.com; " <>
+      "frame-src https://hcaptcha.com https://*.hcaptcha.com; " <>
+      "style-src 'self' https://hcaptcha.com https://*.hcaptcha.com; " <>
+      "connect-src 'self' https://hcaptcha.com https://*.hcaptcha.com"
+  )
+end
+```
+
+```heex
+{Hcaptcha.Template.display(size: "invisible", nonce: @csp_nonce) |> raw()}
+```
 
 ### Verify the response
 

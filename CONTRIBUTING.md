@@ -32,3 +32,9 @@ Checks to run before you open a pull request:
 ```
 git config blame.ignoreRevsFile .git-blame-ignore-revs
 ```
+
+Browser tests run the template in Chromium against the real hCaptcha API:
+
+```
+cd e2e && npm ci && npx playwright install chromium && npx playwright test
+```
