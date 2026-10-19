@@ -1,0 +1,11 @@
+{
+  "name": "hcaptcha-e2e",
+  "private": true,
+  "description": "Browser tests for the hcaptcha template",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.0"
+  }
+}
