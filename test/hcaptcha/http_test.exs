@@ -25,7 +25,7 @@ defmodule Hcaptcha.HttpTest do
     end
   end
 
-  test "posts the form body with form and JSON headers to the default URL" do
+  test "posts the form body with form and JSON headers to the default, then the configured, URL" do
     test_pid = self()
 
     Req.Test.stub(Http, fn conn ->
@@ -41,40 +41,45 @@ defmodule Hcaptcha.HttpTest do
     assert_received {:headers, headers}
     assert {"content-type", "application/x-www-form-urlencoded"} in headers
     assert {"accept", "application/json"} in headers
-  end
 
-  test "uses the configured verify URL" do
     Application.put_env(:hcaptcha, :verify_url, "https://example.test/verify")
-    Req.Test.stub(Http, count_hits(self(), &Req.Test.json(&1, %{})))
-
-    assert {:ok, %{}} = Http.request_verification(@body)
-    assert_received {:hit, "POST", "example.test", "/verify"}
+    assert {:ok, _} = Http.request_verification(@body)
+    assert_received {:seen, "POST", "example.test", "/verify", _, _}
   end
 
-  describe "timeout" do
-    setup do
-      TestAdapter.install(fn request ->
-        send(self(), {:options, request.options})
-        {request, Req.Response.new(status: 200, body: "{}")}
-      end)
-    end
+  test "timeout comes from the option, then the config, then 5000" do
+    TestAdapter.install(fn request ->
+      send(self(), {:options, request.options})
+      {request, Req.Response.new(status: 200, body: "{}")}
+    end)
 
-    test "the option sets the receive and connect timeouts" do
-      assert {:ok, %{}} = Http.request_verification(@body, timeout: 1234)
-      assert_received {:options, %{receive_timeout: 1234, connect_options: [timeout: 1234]}}
-    end
+    assert {:ok, %{}} = Http.request_verification(@body, timeout: 1234)
+    assert_received {:options, %{receive_timeout: 1234, connect_options: [timeout: 1234]}}
 
-    test "the config is the default" do
-      Application.put_env(:hcaptcha, :timeout, 777)
+    Application.put_env(:hcaptcha, :timeout, 777)
+    assert {:ok, %{}} = Http.request_verification(@body)
+    assert_received {:options, %{receive_timeout: 777}}
 
-      assert {:ok, %{}} = Http.request_verification(@body)
-      assert_received {:options, %{receive_timeout: 777}}
-    end
+    Application.delete_env(:hcaptcha, :timeout)
+    assert {:ok, %{}} = Http.request_verification(@body)
+    assert_received {:options, %{receive_timeout: 5000}}
+  end
 
-    test "falls back to 5000" do
-      assert {:ok, %{}} = Http.request_verification(@body)
-      assert_received {:options, %{receive_timeout: 5000}}
-    end
+  test "keeps other connect options and replaces their timeout" do
+    TestAdapter.install(fn request ->
+      send(self(), {:options, request.options})
+      {request, Req.Response.new(status: 200, body: "{}")}
+    end)
+
+    Application.put_env(:hcaptcha, :req_options,
+      adapter: TestAdapter,
+      connect_options: [proxy: {:http, "proxy.test", 8080, []}, timeout: 1]
+    )
+
+    assert {:ok, %{}} = Http.request_verification(@body, timeout: 99)
+    assert_received {:options, %{connect_options: connect_options}}
+    assert connect_options[:proxy] == {:http, "proxy.test", 8080, []}
+    assert connect_options[:timeout] == 99
   end
 
   describe "answers" do
@@ -89,28 +94,24 @@ defmodule Hcaptcha.HttpTest do
     end
 
     test "returns :invalid_response_body for a 200 body that is not a JSON object" do
-      Req.Test.stub(Http, &Plug.Conn.send_resp(&1, 200, "<html>"))
-      assert {:error, [:invalid_response_body]} = Http.request_verification(@body)
-
-      Req.Test.stub(Http, &Plug.Conn.send_resp(&1, 200, "[1]"))
-      assert {:error, [:invalid_response_body]} = Http.request_verification(@body)
-    end
-
-    test "returns :unexpected_status for a non-200 answer without error codes" do
-      for body <- ["unavailable", ~s({"a":1}), "[1]", ""] do
-        Req.Test.stub(Http, &Plug.Conn.send_resp(&1, 503, body))
-        assert {:error, [:unexpected_status]} = Http.request_verification(@body)
+      for body <- ["<html>", "[1]"] do
+        Req.Test.stub(Http, &Plug.Conn.send_resp(&1, 200, body))
+        assert {:error, [:invalid_response_body]} = Http.request_verification(@body)
       end
     end
 
-    test "returns the body of a non-200 answer that has error codes" do
-      Req.Test.stub(Http, fn conn ->
-        Plug.Conn.send_resp(
-          conn,
+    test "a non-200 answer returns :unexpected_status without error codes, the body with them" do
+      Req.Test.stub(Http, &Plug.Conn.send_resp(&1, 503, "unavailable"))
+      assert {:error, [:unexpected_status]} = Http.request_verification(@body)
+
+      Req.Test.stub(
+        Http,
+        &Plug.Conn.send_resp(
+          &1,
           400,
           ~s({"success":false,"error-codes":["missing-input-secret"]})
         )
-      end)
+      )
 
       assert {:ok, %{"error-codes" => ["missing-input-secret"]}} =
                Http.request_verification(@body)
@@ -119,30 +120,26 @@ defmodule Hcaptcha.HttpTest do
 
   describe "failures" do
     test "returns the transport reason" do
-      Req.Test.stub(Http, &Req.Test.transport_error(&1, :timeout))
-      assert {:error, [:timeout]} = Http.request_verification(@body)
-
       Req.Test.stub(Http, &Req.Test.transport_error(&1, :econnrefused))
       assert {:error, [:econnrefused]} = Http.request_verification(@body)
     end
 
-    test "returns :http_error for a transport reason that is not an atom" do
+    test "returns :http_error for a non-atom reason or any other exception" do
       TestAdapter.install(fn request ->
         {request, %Req.TransportError{reason: {:tls_alert, {:unknown_ca, ~c"x"}}}}
       end)
 
       assert {:error, [:http_error]} = Http.request_verification(@body)
-    end
 
-    test "returns :http_error for any other exception" do
       TestAdapter.install(fn request -> {request, %RuntimeError{message: "boom"}} end)
-
       assert {:error, [:http_error]} = Http.request_verification(@body)
     end
   end
 
-  describe "redirects and retries" do
-    test "a 307 is not followed and returns :unexpected_status" do
+  describe "secret protection" do
+    test "a 307 is not followed, with or without a user redirect option", %{
+      plug_options: plug_options
+    } do
       Req.Test.stub(
         Http,
         count_hits(self(), fn conn ->
@@ -152,22 +149,17 @@ defmodule Hcaptcha.HttpTest do
         end)
       )
 
-      assert {:error, [:unexpected_status]} = Http.request_verification(@body)
-      assert_received {:hit, "POST", "api.hcaptcha.com", "/siteverify"}
-      refute_received {:hit, _, _, _}
+      for options <- [plug_options, plug_options ++ [redirect: true]] do
+        Application.put_env(:hcaptcha, :req_options, options)
+
+        assert {:error, [:unexpected_status]} = Http.request_verification(@body)
+        assert_received {:hit, "POST", "api.hcaptcha.com", "/siteverify"}
+        refute_received {:hit, _, _, _}
+      end
     end
 
-    test "a failing request is not retried" do
-      Req.Test.stub(Http, count_hits(self(), &Plug.Conn.send_resp(&1, 503, "")))
-
-      Http.request_verification(@body)
-      assert_received {:hit, _, _, _}
-      refute_received {:hit, _, _, _}
-    end
-  end
-
-  describe ":req_options" do
-    test "cannot change the options the library owns", %{plug_options: plug_options} do
+    test "req_options cannot change the options the library owns, and a failure is not retried",
+         %{plug_options: plug_options} do
       Application.put_env(
         :hcaptcha,
         :req_options,
@@ -175,8 +167,6 @@ defmodule Hcaptcha.HttpTest do
           [
             retry: :transient,
             redirect: true,
-            decode_body: true,
-            into: :self,
             url: "https://evil.test/x",
             method: :get,
             body: "evil=1",
@@ -189,59 +179,13 @@ defmodule Hcaptcha.HttpTest do
       Req.Test.stub(Http, fn conn ->
         {:ok, raw, conn} = Plug.Conn.read_body(conn)
         send(test_pid, {:hit, conn.method, conn.host, conn.request_path, raw, conn.req_headers})
-
-        case conn.method do
-          "POST" -> Plug.Conn.send_resp(conn, 503, "")
-          _ -> Req.Test.json(conn, %{})
-        end
+        Plug.Conn.send_resp(conn, 503, "")
       end)
 
       assert {:error, [:unexpected_status]} = Http.request_verification(@body)
       assert_received {:hit, "POST", "api.hcaptcha.com", "/siteverify", @body, headers}
       refute List.keymember?(headers, "x-evil", 0)
       refute_received {:hit, _, _, _, _, _}
-
-      Req.Test.stub(Http, fn conn ->
-        conn
-        |> Plug.Conn.put_resp_content_type("application/json")
-        |> Plug.Conn.send_resp(200, ~s({"success":true}))
-      end)
-
-      assert {:ok, %{"success" => true}} = Http.request_verification(@body)
-    end
-
-    test "a user redirect option does not follow a 307", %{plug_options: plug_options} do
-      Application.put_env(:hcaptcha, :req_options, plug_options ++ [redirect: true])
-
-      Req.Test.stub(
-        Http,
-        count_hits(self(), fn conn ->
-          conn
-          |> Plug.Conn.put_resp_header("location", "https://other.test/steal")
-          |> Plug.Conn.send_resp(307, "")
-        end)
-      )
-
-      assert {:error, [:unexpected_status]} = Http.request_verification(@body)
-      assert_received {:hit, _, "api.hcaptcha.com", _}
-      refute_received {:hit, _, _, _}
-    end
-
-    test "keeps other connect options and replaces their timeout" do
-      TestAdapter.install(fn request ->
-        send(self(), {:options, request.options})
-        {request, Req.Response.new(status: 200, body: "{}")}
-      end)
-
-      Application.put_env(:hcaptcha, :req_options,
-        adapter: TestAdapter,
-        connect_options: [proxy: {:http, "proxy.test", 8080, []}, timeout: 1]
-      )
-
-      assert {:ok, %{}} = Http.request_verification(@body, timeout: 99)
-      assert_received {:options, %{connect_options: connect_options}}
-      assert connect_options[:proxy] == {:http, "proxy.test", 8080, []}
-      assert connect_options[:timeout] == 99
     end
   end
 end

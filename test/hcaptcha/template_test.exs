@@ -1,66 +1,122 @@
-defmodule HcaptchaTemplateTest do
+defmodule Hcaptcha.TemplateTest do
   use ExUnit.Case, async: true
 
-  test "supplying options to display/1 renders them in the g-hcaptcha div" do
-    template_string =
-      Hcaptcha.Template.display(
+  alias Hcaptcha.Template
+
+  defp ids(html), do: Regex.scan(~r/id="(h-captcha-[0-9a-f]+)"/, html) |> Enum.map(&List.last/1)
+
+  defp config(html) do
+    [_, json] = Regex.run(~r/\}\)\(window, document, (.*)\);\n<\/script>\z/s, html)
+    Jason.decode!(json)
+  end
+
+  test "puts the widget settings in the config and leaves out nil ones" do
+    html =
+      Template.display(
+        public_key: "my_key",
         theme: "dark",
         type: "audio",
         tabindex: 1,
         size: "compact",
         callback: "enableBtn",
-        badge: "inline"
+        badge: "inline",
+        class: "my-captcha"
       )
 
-    assert template_string =~ "data-theme=\"dark\""
-    assert template_string =~ "data-type=\"audio\""
-    assert template_string =~ "data-tabindex=\"1\""
-    assert template_string =~ "data-size=\"compact\""
-    assert template_string =~ "data-callback=\"enableBtn\""
-    assert template_string =~ "data-badge=\"inline\""
+    assert html =~ ~s|<div class="my-captcha" id=|
+    refute html =~ "data-"
+
+    assert %{
+             "widget" => %{
+               "sitekey" => "my_key",
+               "theme" => "dark",
+               "type" => "audio",
+               "tabindex" => "1",
+               "size" => "compact",
+               "badge" => "inline"
+             },
+             "callback" => "enableBtn"
+           } = config(html)
+
+    bare = Template.display()
+    assert config(bare)["widget"] == %{"sitekey" => Application.get_env(:hcaptcha, :public_key)}
+    refute bare =~ ~r/class=|=""/
   end
 
-  test "supplying a public key in options to display/1 overrides it in the g-hcaptcha-div" do
-    template_string =
-      Hcaptcha.Template.display(public_key: "override_test_public_key")
+  test "gives each call a unique id, passed to the script as the widget id" do
+    html = Template.display(size: "invisible") <> Template.display(size: "invisible")
+    [id1, id2] = ids(html)
 
-    assert template_string =~ "data-sitekey=\"override_test_public_key\""
+    assert id1 != id2
+    assert html =~ ~s("id":"#{id1}")
+    assert html =~ ~s("id":"#{id2}")
   end
 
-  test "supplying a hl in options to display/1 overrides it in the script tag" do
-    template_string = Hcaptcha.Template.display(hl: "en")
-    assert template_string =~ "https://js.hcaptcha.com/1/api.js?hl=en"
+  test "escapes class and nonce in attributes" do
+    html = Template.display(class: "a\"b<c", nonce: "a'b&c")
+
+    assert html =~ ~s|class="a&quot;b&lt;c"|
+    assert html =~ ~s(<script nonce="a&#39;b&amp;c">)
   end
 
-  test "supplying a onload in options to display/1 adds it to the script tag" do
-    template_string1 = Hcaptcha.Template.display(onload: "onLoad")
-    template_string2 = Hcaptcha.Template.display(onload: "onLoad", hl: "en")
+  test "escapes values written into JavaScript" do
+    html =
+      Template.display(
+        nonce: "\"><script>x</script>",
+        onload: "a</script>b\u{2028}",
+        theme: "\"><script>alert(1)</script>"
+      )
 
-    assert template_string1 =~
-             "https://js.hcaptcha.com/1/api.js?onload=onLoad&hl"
+    refute html =~ "</script>b"
+    refute html =~ "<script>x"
+    refute html =~ "<script>alert"
+    assert length(Regex.scan(~r/<\/script>/, html)) == 1
 
-    assert template_string2 =~
-             "https://js.hcaptcha.com/1/api.js?onload=onLoad&hl=en"
+    decoded = config(html)
+    assert decoded["nonce"] == "\"><script>x</script>"
+    assert decoded["onload"] == "a</script>b\u{2028}"
+    assert decoded["widget"]["theme"] == "\"><script>alert(1)</script>"
   end
 
-  test "supplying a invisible hcaptcha on option size equal invisible" do
-    template_string = Hcaptcha.Template.display(size: "invisible")
-    assert template_string =~ "window.hcaptcha.execute()"
+  test "sends every widget setting as a string" do
+    widget = config(Template.display(theme: ~c"dark", tabindex: 2, badge: :inline))["widget"]
 
-    template_string = Hcaptcha.Template.display(size: "compact")
-    refute template_string =~ "window.hcaptcha.execute()"
+    assert %{"theme" => "dark", "tabindex" => "2", "badge" => "inline"} = widget
   end
 
-  test "supplying an option to change the callback even if you are using invisible hcaptcha" do
-    template_string = Hcaptcha.Template.display()
-    assert template_string =~ "data-callback=\"\""
+  test "raises on input that is not valid UTF-8" do
+    assert_raise Jason.EncodeError, fn -> Template.display(theme: <<255, 254>>) end
+    assert_raise ArgumentError, fn -> Template.display(nonce: "ab" <> <<255>> <> "cd") end
+    assert_raise ArgumentError, fn -> Template.display(class: <<255>>) end
+  end
 
-    template_string = Hcaptcha.Template.display(size: "invisible")
-    assert template_string =~ "data-callback=\"hcaptchaCallback\""
+  test "sets the nonce on the inline script and in its config; an empty nonce is no attribute" do
+    html = Template.display(nonce: "abc")
+    assert html =~ ~s(<script nonce="abc">)
+    assert config(html)["nonce"] == "abc"
 
-    template_string =
-      Hcaptcha.Template.display(size: "invisible", callback: "myCallback")
+    for options <- [[], [nonce: ""]] do
+      html = Template.display(options)
+      assert html =~ "<script>"
+      assert config(html)["nonce"] in [nil, ""]
+    end
+  end
 
-    assert template_string =~ "data-callback=\"myCallback\""
+  test "writes the API URL, hl, the invisible flag and the callback names into the config" do
+    assert config(Template.display(hl: "fr&x=1"))["src"] ==
+             "https://js.hcaptcha.com/1/api.js?render=explicit&hl=fr%26x%3D1"
+
+    refute config(Template.display())["src"] =~ "hl="
+
+    assert config(Template.display(size: "invisible"))["invisible"] == true
+    assert config(Template.display(size: "compact"))["invisible"] == false
+
+    invisible =
+      config(Template.display(size: "invisible", onload: "myLoad", callback: "myCallback"))
+
+    assert %{"onload" => "myLoad", "callback" => "myCallback"} = invisible
+
+    checkbox = config(Template.display(size: "compact", callback: "myCallback"))
+    assert checkbox["callback"] == "myCallback"
   end
 end
