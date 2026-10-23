@@ -50,7 +50,8 @@ defmodule Hcaptcha.Mixfile do
     [
       {:req, "~> 0.7"},
       {:jason, "~> 1.4"},
-      {:plug, "~> 1.16", only: :test},
+      {:phoenix_live_view, "~> 1.1", optional: true},
+      {:plug, "~> 1.15", optional: true},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.40", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: [:test], runtime: false}
