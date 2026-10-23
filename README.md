@@ -1,6 +1,6 @@
 # Hcaptcha
 
-An Elixir package to add [hCaptcha](https://www.hcaptcha.com/) to Elixir applications: server-side verification and a template that renders the widget.
+An Elixir package to add [hCaptcha](https://www.hcaptcha.com/) to Elixir applications: server-side verification, a template for controller forms, and a LiveView component with a JavaScript hook.
 
 This is a maintained fork of [sebastiangrebe/hcaptcha](https://github.com/sebastiangrebe/hcaptcha), which is itself a fork of [recaptcha](https://github.com/samueljseay/recaptcha). It is not published on Hex.
 
@@ -31,7 +31,7 @@ All keys are read at runtime. `{:system, "VAR"}` tuples are not supported.
 | Key           | Use                                                        | Default                              |
 | :------------ | :--------------------------------------------------------- | :----------------------------------- |
 | `secret`      | Secret sent by `Hcaptcha.verify/2`                         | none (`verify` returns `{:error, [:missing_input_secret]}`) |
-| `public_key`  | Sitekey, read by `Hcaptcha.Template.display/1`             | none                                 |
+| `public_key`  | Sitekey, read by `Hcaptcha.Template.display/1` and `Hcaptcha.Components.hcaptcha/1` | none                                 |
 | `http_client` | Module that implements `Hcaptcha.HttpClient`               | `Hcaptcha.Http`                      |
 | `verify_url`  | Siteverify endpoint                                        | `https://api.hcaptcha.com/siteverify` |
 | `timeout`     | Default for the `timeout` option of `verify/2`, in ms      | `5000`                               |
@@ -75,6 +75,55 @@ Several widgets can share a page. If the hCaptcha script does not load within 10
 | `nonce`      | CSP nonce for the scripts                               | none                      |
 | `theme`, `type`, `tabindex`, `size`, `badge` | hCaptcha widget settings | none                |
 
+### LiveView
+
+`Hcaptcha.Components.hcaptcha/1` and a JavaScript hook cover LiveView forms with `phx-submit`. Do not use the template and the component on one page: each loads the hCaptcha script on its own.
+
+The component needs `phoenix_live_view` (1.1 or later) in your dependencies. If you add it after `hcaptcha` was compiled, run `mix deps.compile hcaptcha --force`.
+
+The hook is in `deps/hcaptcha`. Add `deps` to the esbuild `NODE_PATH`, or add `"hcaptcha": "file:../deps/hcaptcha"` to `assets/package.json`. Register it in `assets/js/app.js`:
+
+```javascript
+import { hooks as colocatedHooks } from "phoenix-colocated/my_app";
+import { Hcaptcha } from "hcaptcha";
+
+const liveSocket = new LiveSocket("/live", Socket, {
+  params: { _csrf_token: csrfToken },
+  hooks: { ...colocatedHooks, Hcaptcha },
+});
+```
+
+Put the component inside a form that `POST`s to a controller. Without a sitekey the component raises, so render it under `:if`, or use the test keys:
+
+```heex
+<.form for={@form} action={~p"/verify"} method="post" phx-submit="submit">
+  <Hcaptcha.Components.hcaptcha :if={Hcaptcha.public_key()} id="captcha" />
+  <button type="submit">Log in</button>
+</.form>
+```
+
+On `submit`, validate, then call `execute/2`, not in the render that adds the widget. The hook runs the challenge and posts the form with `h-captcha-response`, without the name and value of the clicked button:
+
+```elixir
+def handle_event("submit", %{"user" => params}, socket) do
+  case validate(params) do
+    :ok -> {:noreply, Hcaptcha.Components.execute(socket, "captcha")}
+    {:error, form} -> {:noreply, assign(socket, form: form)}
+  end
+end
+```
+
+Timeouts work as for the template.
+
+| Attribute | Use | Default |
+| :-------- | :-- | :------ |
+| `id` | Element id, also the `id` for `execute/2`. Required | none |
+| `sitekey` | Sitekey | `:public_key` from config |
+| `hl` | Widget language. The first widget on the page sets it | detected by hCaptcha |
+| `class` | CSS classes | none |
+
+To disable the captcha, do not render the component and set `phx-trigger-action={@trigger}` on the form from `handle_event/3`. Skip `Hcaptcha.verify/2` in the controller on the same condition.
+
 ### Content Security Policy
 
 hCaptcha [needs these directives](https://docs.hcaptcha.com/#content-security-policy-settings):
@@ -86,7 +135,7 @@ style-src   https://hcaptcha.com https://*.hcaptcha.com
 connect-src https://hcaptcha.com https://*.hcaptcha.com
 ```
 
-With a nonce policy, pass the nonce to `display/1`:
+With a nonce policy, pass the nonce to `display/1`. The LiveView hook reuses the nonce of the page's scripts, which is enough with `'strict-dynamic'`:
 
 ```elixir
 # router.ex
@@ -111,6 +160,8 @@ end
 {Hcaptcha.Template.display(size: "invisible", nonce: @csp_nonce) |> raw()}
 ```
 
+Set `@csp_nonce` on your own `<script>` tags too.
+
 ### Verify the response
 
 ```elixir
@@ -123,7 +174,7 @@ def create(conn, params) do
 
     {:error, [:missing_input_response]} ->
       # No token: the script was blocked or did not run.
-      render_error(conn, "Enable JavaScript and reload the page.")
+      render_error(conn, "The captcha could not run. Reload the page and try again.")
 
     {:error, _errors} ->
       render_error(conn, "The captcha check failed. Try again.")
@@ -185,7 +236,7 @@ config :hcaptcha,
 
 The mock never calls the network. With the test secret it accepts the test token and `valid_response`. Every other token, `invalid_response` included, returns `:invalid_input_response`. With any other secret it returns `{:error, [:mock_requires_test_secret]}`, so a mock left in production rejects every user and lets nobody through. The mock records nothing and sends no message. To check the request body, stub the API with `Req.Test` (below).
 
-To stub the API itself, use `Req.Test`. It needs `{:plug, "~> 1.16", only: :test}` in your own dependencies:
+To stub the API itself, use `Req.Test`. It needs `{:plug, "~> 1.15", only: :test}` in your own dependencies, unless Phoenix already brings `plug`:
 
 ```elixir
 config :hcaptcha, req_options: [plug: {Req.Test, Hcaptcha.Http}]
