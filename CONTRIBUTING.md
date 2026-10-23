@@ -26,6 +26,10 @@ Checks to run before you open a pull request:
 3. `mix test --warnings-as-errors`
 4. `mix credo`
 5. `mix dialyzer` (the first run builds the PLTs and is slow)
+6. `MIX_ENV=dev mix docs --warnings-as-errors`
+7. `npm ci && npm test && npm run format:check`
+
+After you change `assets/js/template.js` or `assets/js/core.js`, run `npm run build` and commit `lib/hcaptcha/template.js`.
 
 `.git-blame-ignore-revs` lists commits that only change formatting. To skip them in `git blame`:
 
@@ -33,7 +37,7 @@ Checks to run before you open a pull request:
 git config blame.ignoreRevsFile .git-blame-ignore-revs
 ```
 
-Browser tests run the template in Chromium against the real hCaptcha API:
+Browser tests run the template and the LiveView hook in Chromium against the real hCaptcha API:
 
 ```
 cd e2e && npm ci && npx playwright install chromium && npx playwright test

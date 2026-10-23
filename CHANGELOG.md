@@ -38,6 +38,10 @@ In invisible mode, `Hcaptcha.Template.display/1` now listens only to the form th
 
 The new `:nonce` option sets the CSP nonce on the inline script and on the script it adds. Every option is escaped in the HTML and in the script, and the container has an `id` and no `h-captcha` class or `data-*` attribute: the widget settings go through the script. The new `:class` option sets its CSS class. The API script loads once per page with explicit render, and several widgets can share a page. `:onload` names a global function called once when the API is ready. Like `:hl`, the first widget on the page sets it.
 
+### LiveView
+
+New `Hcaptcha.Components.hcaptcha/1` component and `Hcaptcha` JavaScript hook for LiveView forms. The server calls `Hcaptcha.Components.execute/2`, then the hook runs the challenge and posts the form to its controller, with the same timeouts as the template. `phoenix_live_view` and `plug` are optional dependencies.
+
 ### Migration
 
 #### Template

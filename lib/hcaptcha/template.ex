@@ -72,7 +72,9 @@ defmodule Hcaptcha.Template do
     |> Map.new(fn {key, value} -> {key, to_string(value)} end)
   end
 
-  defp api_url(options) do
+  @doc false
+  @spec api_url(keyword()) :: String.t()
+  def api_url(options) do
     query =
       [render: "explicit"] ++ if(options[:hl], do: [hl: options[:hl]], else: [])
 
