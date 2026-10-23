@@ -1,7 +1,7 @@
 {
   "name": "hcaptcha-e2e",
   "private": true,
-  "description": "Browser tests for the hcaptcha template",
+  "description": "Browser tests for the hcaptcha LiveView hook and template",
   "scripts": {
     "test": "playwright test"
   },
