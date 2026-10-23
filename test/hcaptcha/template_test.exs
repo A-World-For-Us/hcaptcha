@@ -6,7 +6,7 @@ defmodule Hcaptcha.TemplateTest do
   defp ids(html), do: Regex.scan(~r/id="(h-captcha-[0-9a-f]+)"/, html) |> Enum.map(&List.last/1)
 
   defp config(html) do
-    [_, json] = Regex.run(~r/\}\)\(window, document, (.*)\);\n<\/script>\z/s, html)
+    [_, json] = Regex.run(~r/run\((\{.*\})\);\}\)\(\);\n<\/script>\z/s, html)
     Jason.decode!(json)
   end
 
@@ -40,7 +40,8 @@ defmodule Hcaptcha.TemplateTest do
 
     bare = Template.display()
     assert config(bare)["widget"] == %{"sitekey" => Application.get_env(:hcaptcha, :public_key)}
-    refute bare =~ ~r/class=|=""/
+    [container | _] = String.split(bare, "\n", parts: 2)
+    refute container =~ ~r/class=|=""/
   end
 
   test "gives each call a unique id, passed to the script as the widget id" do
